@@ -4,6 +4,9 @@
 (function () {
   'use strict';
 
+  // 文字位置拖拽范围（相对画布宽度的比例）
+  const TEXT_POS_MAX = 0.35;
+
   // ══════════════════════════════════════════════════════════════════════════
   // 状态
   // ══════════════════════════════════════════════════════════════════════════
@@ -676,17 +679,34 @@
     });
     const preset = activePreset();
     const job = activeJob();
-    if (job) { job.presetId = id; fillBorderForm(preset, job); }
+    if (job) {
+      job.presetId = id;
+      // 按 presetType 决定覆盖范围
+      if (preset.presetType === 'style') {
+        // 仅样式预设：只覆盖 border，保留现有 infoOverrides
+        job.borderOverrides = { ...preset.border };
+      } else {
+        // 完整预设：覆盖 border + infoBar
+        job.borderOverrides = { ...preset.border };
+        job.infoOverrides = { ...preset.infoBar };
+      }
+      fillBorderForm(preset, job);
+    }
 
     // Apply to all multi-selected jobs
     if (state.selectedJobIds.size > 1) {
       for (const jid of state.selectedJobIds) {
-        if (jid === state.activeJobId) continue; // already handled above
+        if (jid === state.activeJobId) continue;
         const j = state.jobs.find(x => x.id === jid);
         if (j) {
           j.presetId = id;
-          j.borderOverrides = {};
-          j.infoOverrides = {};
+          if (preset.presetType === 'style') {
+            j.borderOverrides = { ...preset.border };
+            // 不触碰 infoOverrides
+          } else {
+            j.borderOverrides = { ...preset.border };
+            j.infoOverrides = { ...preset.infoBar };
+          }
           j.cropRect = null;
         }
       }
@@ -885,10 +905,14 @@
     if (oxRange && oxLabel) oxRange.addEventListener('input', () => {
       oxLabel.textContent = parseFloat(oxRange.value).toFixed(2);
       updateTextPosHandle();
+      const job = activeJob();
+      if (job) updateAlignmentGuides(job.infoOverrides || {});
     });
     if (oyRange && oyLabel) oyRange.addEventListener('input', () => {
       oyLabel.textContent = parseFloat(oyRange.value).toFixed(2);
       updateTextPosHandle();
+      const job = activeJob();
+      if (job) updateAlignmentGuides(job.infoOverrides || {});
     });
 
     // 重置文字位置按钮
@@ -905,6 +929,7 @@
         if (oyRange) oyRange.value = 0;
         if (oyLabel) oyLabel.textContent = '0.00';
         updateTextPosHandle();
+        updateAlignmentGuides(job.infoOverrides);
         schedulePreview();
       });
     }
@@ -921,6 +946,158 @@
         schedulePreview();
       });
     }
+
+    // 文字快捷对齐按钮
+    const btnHCenter = document.getElementById('btn-text-h-center');
+    const btnVCenter = document.getElementById('btn-text-v-center');
+    const btnLeft = document.getElementById('btn-text-left');
+    const btnRight = document.getElementById('btn-text-right');
+
+    btnHCenter?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.infoOverrides) job.infoOverrides = {};
+      job.infoOverrides.textOffsetX = 0;
+      const oxR = document.getElementById('text-offset-x');
+      const oxL = document.getElementById('text-offset-x-label');
+      if (oxR) oxR.value = 0;
+      if (oxL) oxL.textContent = '0.00';
+      schedulePreview();
+      updateTextPosHandle();
+      updateAlignmentGuides(job.infoOverrides);
+    });
+
+    btnVCenter?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.infoOverrides) job.infoOverrides = {};
+      job.infoOverrides.textOffsetY = 0;
+      const oyR = document.getElementById('text-offset-y');
+      const oyL = document.getElementById('text-offset-y-label');
+      if (oyR) oyR.value = 0;
+      if (oyL) oyL.textContent = '0.00';
+      schedulePreview();
+      updateTextPosHandle();
+      updateAlignmentGuides(job.infoOverrides);
+    });
+
+    btnLeft?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.infoOverrides) job.infoOverrides = {};
+      // 左对齐：与拖拽最大范围一致
+      job.infoOverrides.textOffsetX = TEXT_POS_MAX;
+      const oxR = document.getElementById('text-offset-x');
+      if (oxR) oxR.value = TEXT_POS_MAX;
+      schedulePreview();
+      updateTextPosHandle();
+      updateAlignmentGuides(job.infoOverrides);
+    });
+
+    btnRight?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.infoOverrides) job.infoOverrides = {};
+      // 右对齐：与拖拽最小范围一致
+      job.infoOverrides.textOffsetX = -TEXT_POS_MAX;
+      const oxR = document.getElementById('text-offset-x');
+      if (oxR) oxR.value = -TEXT_POS_MAX;
+      schedulePreview();
+      updateTextPosHandle();
+      updateAlignmentGuides(job.infoOverrides);
+    });
+
+    // 边框对称按钮
+    const btnHSym = document.getElementById('btn-border-h-symmetry');
+    const btnVSym = document.getElementById('btn-border-v-symmetry');
+
+    btnHSym?.addEventListener('click', () => {
+      const job = activeJob();
+      const preset = activePreset();
+      if (!job || !preset) return;
+      if (!job.borderOverrides) job.borderOverrides = {};
+      const b = Object.assign({}, preset.border, job.borderOverrides);
+      const avg = (b.left + b.right) / 2;
+      job.borderOverrides.left = avg;
+      job.borderOverrides.right = avg;
+      // 更新 UI
+      const lSlider = document.getElementById('border-left');
+      const rSlider = document.getElementById('border-right');
+      const lNum = document.getElementById('border-left-num');
+      const rNum = document.getElementById('border-right-num');
+      if (lSlider) lSlider.value = avg;
+      if (rSlider) rSlider.value = avg;
+      if (lNum) lNum.value = (avg * 100).toFixed(1);
+      if (rNum) rNum.value = (avg * 100).toFixed(1);
+      schedulePreview();
+      requestAnimationFrame(updateBorderResizeHandles);
+    });
+
+    btnVSym?.addEventListener('click', () => {
+      const job = activeJob();
+      const preset = activePreset();
+      if (!job || !preset) return;
+      if (!job.borderOverrides) job.borderOverrides = {};
+      const b = Object.assign({}, preset.border, job.borderOverrides);
+      const avg = (b.top + b.bottom) / 2;
+      job.borderOverrides.top = avg;
+      job.borderOverrides.bottom = avg;
+      const tSlider = document.getElementById('border-top');
+      const bSlider = document.getElementById('border-bottom');
+      const tNum = document.getElementById('border-top-num');
+      const bNum = document.getElementById('border-bottom-num');
+      if (tSlider) tSlider.value = avg;
+      if (bSlider) bSlider.value = avg;
+      if (tNum) tNum.value = (avg * 100).toFixed(1);
+      if (bNum) bNum.value = (avg * 100).toFixed(1);
+      schedulePreview();
+      requestAnimationFrame(updateBorderResizeHandles);
+    });
+
+    // 边框居中对画布按钮
+    const btnBHCenter = document.getElementById('btn-border-h-center');
+    const btnBVCenter = document.getElementById('btn-border-v-center');
+
+    btnBHCenter?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.borderOverrides) job.borderOverrides = {};
+      const preset = activePreset();
+      const b = Object.assign({}, preset?.border || {}, job.borderOverrides);
+      // 水平居中：左右边框取平均值
+      const avg = (b.left + b.right) / 2;
+      job.borderOverrides.left = avg;
+      job.borderOverrides.right = avg;
+      // 同步 UI
+      ['left', 'right'].forEach(dir => {
+        const s = document.getElementById(`border-${dir}`);
+        const n = document.getElementById(`border-${dir}-num`);
+        if (s) s.value = avg;
+        if (n) n.value = (avg * 100).toFixed(1);
+      });
+      schedulePreview();
+      requestAnimationFrame(updateBorderResizeHandles);
+    });
+
+    btnBVCenter?.addEventListener('click', () => {
+      const job = activeJob();
+      if (!job) return;
+      if (!job.borderOverrides) job.borderOverrides = {};
+      const preset = activePreset();
+      const b = Object.assign({}, preset?.border || {}, job.borderOverrides);
+      // 垂直居中：上下边框取平均值
+      const avg = (b.top + b.bottom) / 2;
+      job.borderOverrides.top = avg;
+      job.borderOverrides.bottom = avg;
+      ['top', 'bottom'].forEach(dir => {
+        const s = document.getElementById(`border-${dir}`);
+        const n = document.getElementById(`border-${dir}-num`);
+        if (s) s.value = avg;
+        if (n) n.value = (avg * 100).toFixed(1);
+      });
+      schedulePreview();
+      requestAnimationFrame(updateBorderResizeHandles);
+    });
   }
 
   function fillBorderForm(preset, job) {
@@ -1123,8 +1300,16 @@
 
   function buildMergedPreset(preset, job) {
     if (!preset) return preset;
-    const mergedInfo = Object.assign({}, preset.infoBar, job?.infoOverrides || {});
-    // 若 job 有 extraLines override，用它；否则沿用 preset 的（可能为空数组）
+    // 从预设 infoBar 开始
+    const mergedInfo = { ...preset.infoBar };
+    // 只覆盖 job 中显式设置的值
+    const overrides = job?.infoOverrides || {};
+    for (const key of Object.keys(overrides)) {
+      if (overrides[key] !== undefined) {
+        mergedInfo[key] = overrides[key];
+      }
+    }
+    // 确保 extraLines 是数组
     if (!Array.isArray(mergedInfo.extraLines)) mergedInfo.extraLines = [];
     return {
       ...preset,
@@ -1184,18 +1369,45 @@
     }
   }
 
+  // 拖拽中强制渲染，不设置 isRendering 标志（避免阻塞后续渲染）
+  async function renderPreviewForce() {
+    const job = activeJob();
+    const preset = activePreset();
+    if (!job || !preset) return;
+
+    try {
+      const mergedPreset = buildMergedPreset(preset, job);
+      const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1400);
+      displayPreview(canvas);
+      updateSizeInfo(canvas);
+      requestAnimationFrame(updateBorderResizeHandlesDrag);
+    } catch (e) {
+      console.error('[renderForce] error:', e);
+    }
+  }
+
   function displayPreview(offscreenCanvas) {
     const preview = document.getElementById('canvas-preview');
     if (!preview) return;
     const wrapper = document.getElementById('preview-wrapper');
+
+    // 边框拖拽中：更新 canvas 像素尺寸以反映新边框值，但 CSS 尺寸锁定（外框不动）
+    if (_borderDragState) {
+      preview.width  = offscreenCanvas.width;
+      preview.height = offscreenCanvas.height;
+      const ctx = preview.getContext('2d');
+      ctx.drawImage(offscreenCanvas, 0, 0);
+      // 不改变 CSS 尺寸，浏览器自动缩放新像素到锁定 CSS 尺寸
+      return;
+    }
 
     preview.width  = offscreenCanvas.width;
     preview.height = offscreenCanvas.height;
     const ctx = preview.getContext('2d');
     ctx.drawImage(offscreenCanvas, 0, 0);
 
-    // 边框拖拽时锁定 canvas 屏幕尺寸，不重新应用缩放，防止画布跳动
-    if (!_borderDragState) applyZoom(wrapper, preview);
+    // 画布渲染后应用缩放
+    applyZoom(wrapper, preview);
   }
 
   function clearPreview() {
@@ -1257,6 +1469,7 @@
 
   function applyZoom(wrapper, canvas) {
     if (!wrapper || !canvas) return;
+
     if (state.zoom === 'fit') {
       canvas.style.width  = '';
       canvas.style.height = '';
@@ -1297,13 +1510,25 @@
         const job       = activeJob();
         if (!preset) return;
 
+        // 读取预设类型选择
+        const presetTypeEl = document.querySelector('input[name="preset-type"]:checked');
+        const presetType = presetTypeEl?.value || 'full';
+
+        const merged = buildMergedPreset(preset, job);
         const newPreset = {
-          ...buildMergedPreset(preset, job),
+          ...merged,
           id: 'custom-' + uid(),
           name: nameInput?.value.trim() || '我的预设',
           category: catInput?.value || 'custom',
           isCustom: true,
+          presetType: presetType,
         };
+
+        // 仅样式预设：恢复为原始 infoBar，不保存用户修改的信息字段
+        if (presetType === 'style') {
+          newPreset.infoBar = { ...preset.infoBar };
+        }
+
         Storage.saveCustomPreset(newPreset);
         state.presets = Storage.allPresets();
         renderPresetGrid();
@@ -1376,6 +1601,15 @@
       if (state.slotCropMode) exitSlotCropMode(false);
       else exitCropMode(false);
     });
+
+    // 锁定比例开关
+    const btnLockRatio = document.getElementById('btn-crop-lock-ratio');
+    btnLockRatio?.addEventListener('click', () => {
+      if (!cropEditorInstance) return;
+      cropEditorInstance.lockRatio = !cropEditorInstance.lockRatio;
+      btnLockRatio.classList.toggle('active', cropEditorInstance.lockRatio);
+      btnLockRatio.textContent = cropEditorInstance.lockRatio ? '🔒 锁定比例' : '🔓 自由比例';
+    });
   }
 
   function updateCropButton() {
@@ -1439,6 +1673,13 @@
       cropCanvas.style.height = rect.height + 'px';
 
       cropEditorInstance = new CropEditor(cropCanvas, img, targetRatio, dpr);
+
+      // 初始化锁定比例按钮状态
+      const btnLockRatio = document.getElementById('btn-crop-lock-ratio');
+      if (btnLockRatio) {
+        btnLockRatio.classList.toggle('active', cropEditorInstance.lockRatio);
+        btnLockRatio.textContent = cropEditorInstance.lockRatio ? '🔒 锁定比例' : '🔓 自由比例';
+      }
 
       if (job.cropRect) {
         cropEditorInstance.setFromCropRect(job.cropRect);
@@ -1964,144 +2205,145 @@
       else enterBorderResizeMode();
     });
 
+    // ── 拖拽处理函数（先定义，后注册）───
+    const onBorderDragMove = (e) => {
+      if (!_borderDragState) return;
+      const { shorter, initialScaleX, initialScaleY } = _borderDragState;
+      const dxL = (e.clientX - _borderDragState.startX) / initialScaleX;
+      const dyL = (e.clientY - _borderDragState.startY) / initialScaleY;
+
+      const job = activeJob();
+      if (!job) return;
+
+      const { corner, type, startBTop, startBBottom, startBLeft, startBRight } = _borderDragState;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+      if (corner === 'tl' || corner === 'tr' || corner === 'bl' || corner === 'br') {
+        let proj;
+        if      (corner === 'tl') proj = (-dxL - dyL) / 2;
+        else if (corner === 'tr') proj = ( dxL - dyL) / 2;
+        else if (corner === 'bl') proj = (-dxL + dyL) / 2;
+        else                      proj = ( dxL + dyL) / 2;
+        const delta = proj / shorter;
+        const sign = type === 'inner' ? -1 : 1;
+        job.borderOverrides.top    = clamp(startBTop    + sign * delta, 0, 0.60);
+        job.borderOverrides.bottom = clamp(startBBottom + sign * delta, 0, 0.60);
+        job.borderOverrides.left   = clamp(startBLeft   + sign * delta, 0, 0.60);
+        job.borderOverrides.right  = clamp(startBRight  + sign * delta, 0, 0.60);
+      } else {
+        if (type === 'outer') {
+          if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    - dyL / shorter, 0, 0.60);
+          else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom + dyL / shorter, 0, 0.60);
+          else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   - dxL / shorter, 0, 0.60);
+          else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  + dxL / shorter, 0, 0.60);
+        } else {
+          if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    + dyL / shorter, 0, 0.60);
+          else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom - dyL / shorter, 0, 0.60);
+          else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   + dxL / shorter, 0, 0.60);
+          else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  - dxL / shorter, 0, 0.60);
+        }
+      }
+
+      ['top', 'bottom', 'left', 'right'].forEach(dir => {
+        const v = job.borderOverrides[dir];
+        if (v === undefined) return;
+        const s = document.getElementById(`border-${dir}`);
+        const n = document.getElementById(`border-${dir}-num`);
+        if (s) s.value = v;
+        if (n) n.value = (v * 100).toFixed(1);
+      });
+
+      scheduleSessionSave();
+      updateBorderResizeHandlesDrag();
+
+      const _now = performance.now();
+      if (_now - _lastBorderRenderTime > 80) {
+        _lastBorderRenderTime = _now;
+        if (_rafPreview) cancelAnimationFrame(_rafPreview);
+        _rafPreview = requestAnimationFrame(() => {
+          _rafPreview = null;
+          renderPreviewForce();
+        });
+      }
+    };
+
+    const onBorderDragEnd = () => {
+      if (!_borderDragState) return;
+      if (_rafPreview) { cancelAnimationFrame(_rafPreview); _rafPreview = null; }
+      const preType = _borderDragState.type;
+      const preCorner = _borderDragState.corner;
+      _borderDragState = null;
+      _lastBorderRenderTime = 0;
+      renderPreview();
+    };
+
+    // ── 句柄事件（pointerdown 启动拖拽）───
     document.querySelectorAll('.br-handle').forEach(handle => {
-      handle.addEventListener('pointerdown', e => {
+      handle.addEventListener('pointerdown', (e) => {
         if (!state.borderResizeMode) return;
         e.preventDefault();
         handle.setPointerCapture(e.pointerId);
 
-        const corner  = handle.dataset.corner;
-        const layout  = CanvasRenderer.getLastLayout();
-        const job     = activeJob();
-        const preset  = activePreset();
+        const corner = handle.dataset.corner;
+        const layout = CanvasRenderer.getLastLayout();
+        const job    = activeJob();
+        const preset = activePreset();
         if (!layout || !job || !preset) return;
 
         const b = Object.assign({}, preset.border, job.borderOverrides || {});
-
-        // 锁定 canvas 屏幕尺寸：拖拽期间 border 变化会改变 canvas 像素尺寸
-        // 若不锁定，applyZoom 每次渲染后会重算 CSS 宽高，导致整体画布跳动
         const cvs = document.getElementById('canvas-preview');
-        const lockedRect = cvs ? cvs.getBoundingClientRect() : { left: 0, top: 0, width: 100, height: 100 };
+        const startRect = cvs ? cvs.getBoundingClientRect() : { left: 0, top: 0, width: 100, height: 100 };
+
         if (cvs) {
+          cvs.style.width     = cvs.offsetWidth + 'px';
+          cvs.style.height    = cvs.offsetHeight + 'px';
           cvs.style.maxWidth  = 'none';
           cvs.style.maxHeight = 'none';
-          cvs.style.width     = lockedRect.width  + 'px';
-          cvs.style.height    = lockedRect.height + 'px';
         }
 
         _borderDragState = {
           corner,
-          type:          handle.dataset.type,   // 'outer' | 'inner'
+          type:          handle.dataset.type,
           startX:        e.clientX,
           startY:        e.clientY,
           startBTop:     b.top    ?? 0.05,
           startBBottom:  b.bottom ?? 0.22,
           startBLeft:    b.left   ?? 0.05,
           startBRight:   b.right  ?? 0.05,
-          savedZoom:     state.zoom,        // 松手时恢复
-          lockedRect,
+          startRect,
           photoW:        layout.photoW,
           photoH:        layout.photoH,
           shorter:       layout.shorter,
           presetBorder:  Object.assign({}, preset.border),
-          // 以拖拽起点时的比例为基准，保证拖拽灵敏度全程一致
-          initialScaleX: lockedRect.width  / (layout.canvasW || 1),
-          initialScaleY: lockedRect.height / (layout.canvasH || 1),
+          initialScaleX: startRect.width  / (layout.canvasW || 1),
+          initialScaleY: startRect.height / (layout.canvasH || 1),
         };
         _lastBorderRenderTime = 0;
       });
 
-      handle.addEventListener('pointermove', e => {
-        if (!_borderDragState) return;
-        // 使用拖拽起点的固定比例，保证灵敏度全程一致，不受中途渲染影响
-        const { shorter, initialScaleX, initialScaleY } = _borderDragState;
-        const dxL = (e.clientX - _borderDragState.startX) / initialScaleX;  // canvas pixels
-        const dyL = (e.clientY - _borderDragState.startY) / initialScaleY;
+      // pointer 事件（真实浏览器：pointer capture 确保事件路由到句柄）
+      handle.addEventListener('pointermove', onBorderDragMove);
+      handle.addEventListener('pointerup', onBorderDragEnd);
+    });
 
-        const job = activeJob();
-        if (!job) return;
+    // ── window 级别事件（Playwright 兼容 + pointer capture 兜底）───
+    window.addEventListener('mousemove', onBorderDragMove);
+    window.addEventListener('mouseup', onBorderDragEnd);
+    window.addEventListener('pointermove', onBorderDragMove);
+    window.addEventListener('pointerup', onBorderDragEnd);
 
-        const { corner, type, startBTop, startBBottom, startBLeft, startBRight } = _borderDragState;
-        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-        if (corner === 'tl' || corner === 'tr' || corner === 'bl' || corner === 'br') {
-          // 等比例：四个边框同步缩放，计算朝外方向的投影分量
-          let proj;
-          if      (corner === 'tl') proj = (-dxL - dyL) / 2;
-          else if (corner === 'tr') proj = ( dxL - dyL) / 2;
-          else if (corner === 'bl') proj = (-dxL + dyL) / 2;
-          else                      proj = ( dxL + dyL) / 2; // br
-          const delta = proj / shorter;
-          // 外框：往外拖（proj > 0）→ 边框增大；内框：往内拖（proj < 0 for inward）→ 边框增大
-          const sign = type === 'inner' ? -1 : 1;
-          job.borderOverrides.top    = clamp(startBTop    + sign * delta, 0, 0.50);
-          job.borderOverrides.bottom = clamp(startBBottom + sign * delta, 0, 0.50);
-          job.borderOverrides.left   = clamp(startBLeft   + sign * delta, 0, 0.50);
-          job.borderOverrides.right  = clamp(startBRight  + sign * delta, 0, 0.50);
-        } else {
-          // 自由：仅控制对应单边
-          // 外框：拖离画布中心 → 边框增大（drag UP = bTop++, drag DOWN = bBottom++）
-          // 内框：拖向照片中心 → 边框增大（drag DOWN on top = bTop++, drag UP on bottom = bBottom++）
-          if (type === 'outer') {
-            if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    - dyL / shorter, 0, 0.50);
-            else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom + dyL / shorter, 0, 0.50);
-            else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   - dxL / shorter, 0, 0.50);
-            else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  + dxL / shorter, 0, 0.50);
-          } else {
-            if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    + dyL / shorter, 0, 0.50);
-            else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom - dyL / shorter, 0, 0.50);
-            else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   + dxL / shorter, 0, 0.50);
-            else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  - dxL / shorter, 0, 0.50);
-          }
+    // 浏览器窗口缩放时重新定位
+    let resizeRaf = null;
+    window.addEventListener('resize', () => {
+      if (!state.borderResizeMode) return;
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        if (_borderDragState) {
+          const cvs = document.getElementById('canvas-preview');
+          if (cvs) _borderDragState.lockedRect = cvs.getBoundingClientRect();
         }
-
-        // Sync sliders
-        ['top', 'bottom', 'left', 'right'].forEach(dir => {
-          const v = job.borderOverrides[dir];
-          if (v === undefined) return;
-          const s = document.getElementById(`border-${dir}`);
-          const n = document.getElementById(`border-${dir}-num`);
-          if (s) s.value = v;
-          if (n) n.value = (v * 100).toFixed(1);
-        });
-
-        scheduleSessionSave();
-
-        // 立即更新句柄位置（预测算法，不依赖上一帧 layout）
-        updateBorderResizeHandlesDrag();
-
-        // 限速渲染：拖拽期间最多约 12fps，避免密集渲染导致卡顿
-        const _now = performance.now();
-        if (_now - _lastBorderRenderTime > 80) {
-          _lastBorderRenderTime = _now;
-          if (_rafPreview) cancelAnimationFrame(_rafPreview);
-          _rafPreview = requestAnimationFrame(() => {
-            _rafPreview = null;
-            if (!state.isRendering) renderPreview();
-          });
-        }
-      });
-
-      handle.addEventListener('pointerup', () => {
-        if (!_borderDragState) return;
-        const { savedZoom } = _borderDragState;
-
-        // 解锁 canvas CSS 尺寸
-        const cvs = document.getElementById('canvas-preview');
-        if (cvs) {
-          cvs.style.width     = '';
-          cvs.style.height    = '';
-          cvs.style.maxWidth  = '';
-          cvs.style.maxHeight = '';
-        }
-
-        // 取消任何挂起的拖拽渲染
-        if (_rafPreview) { cancelAnimationFrame(_rafPreview); _rafPreview = null; }
-        _borderDragState = null;
-        _lastBorderRenderTime = 0;
-
-        setZoom(savedZoom);   // 恢复缩放（调用 applyZoom 重新布局）
-        renderPreview();      // 松手后做一次精确渲染
+        updateBorderResizeHandles();
       });
     });
   }
@@ -2175,6 +2417,29 @@
       l.style.width  = pos.width  + 'px';
       l.style.height = pos.height + 'px';
     });
+
+    // 对称参考线
+    const bForGuide = Object.assign({}, preset.border, job.borderOverrides || {});
+
+    const hDiff = Math.abs(bForGuide.left - bForGuide.right);
+    const guideV = document.getElementById('guide-v');
+    if (guideV) guideV.style.display = hDiff < 0.01 ? 'block' : 'none';
+
+    const vDiff = Math.abs(bForGuide.top - bForGuide.bottom);
+    const guideH = document.getElementById('guide-h');
+    if (guideH) guideH.style.display = vDiff < 0.01 ? 'block' : 'none';
+
+    // 边框数值标签
+    const topLabel = document.querySelector('.br-top');
+    const bottomLabel = document.querySelector('.br-bottom');
+    const leftLabel = document.querySelector('.br-left');
+    const rightLabel = document.querySelector('.br-right');
+    if (topLabel) topLabel.textContent = `上 ${(bForGuide.top * 100).toFixed(1)}%`;
+    if (bottomLabel) bottomLabel.textContent = `下 ${(bForGuide.bottom * 100).toFixed(1)}%`;
+    if (leftLabel) leftLabel.textContent = `左 ${(bForGuide.left * 100).toFixed(1)}%`;
+    if (rightLabel) rightLabel.textContent = `右 ${(bForGuide.right * 100).toFixed(1)}%`;
+
+    requestAnimationFrame(updateBorderResizeHandles);
   }
 
   function enterBorderResizeMode() {
@@ -2191,6 +2456,15 @@
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = true;
     _borderDragState = null;
+
+    // Reset alignment guides
+    const guideV = document.getElementById('guide-v');
+    const guideH = document.getElementById('guide-h');
+    if (guideV) guideV.style.display = 'none';
+    if (guideH) guideH.style.display = 'none';
+
+    // 退出时渲染最终结果，让用户看到新的边框效果
+    schedulePreview();
   }
 
   function updateBorderResizeHandles() {
@@ -2273,6 +2547,51 @@
       line.style.width  = pos.width  + 'px';
       line.style.height = pos.height + 'px';
     });
+
+    // ── 对称检测 + 数值标签 ─────────────────────────────────────────────────
+    const job = activeJob();
+    const preset = activePreset();
+    if (!job || !preset) return;
+    const b = Object.assign({}, preset.border, job.borderOverrides || {});
+    const bLeftPct = b.left * 100;
+    const bRightPct = b.right * 100;
+    const bTopPct = b.top * 100;
+    const bBottomPct = b.bottom * 100;
+
+    // 更新四边数值标签
+    const setVal = (id, pct) => { const el = document.getElementById(id); if (el) el.textContent = pct.toFixed(1) + '%'; };
+    setVal('br-left-val', bLeftPct);
+    setVal('br-right-val', bRightPct);
+    setVal('br-top-val', bTopPct);
+    setVal('br-bottom-val', bBottomPct);
+
+    // 水平对称检测：左右差值 < 1% 显示中线
+    const hDiff = Math.abs(bLeftPct - bRightPct);
+    const guideV = document.getElementById('guide-v');
+    if (guideV) {
+      if (hDiff < 1) {
+        const midX = rect.left + (bLeft + photoW / 2) * scaleX;
+        guideV.style.left = midX + 'px';
+        guideV.style.display = 'block';
+        guideV.style.background = 'rgba(255, 100, 100, 0.6)';
+      } else {
+        guideV.style.display = 'none';
+      }
+    }
+
+    // 垂直对称检测：上下差值 < 1% 显示中线
+    const vDiff = Math.abs(bTopPct - bBottomPct);
+    const guideH = document.getElementById('guide-h');
+    if (guideH) {
+      if (vDiff < 1) {
+        const midY = rect.top + (bTop + photoH / 2) * scaleY;
+        guideH.style.top = midY + 'px';
+        guideH.style.display = 'block';
+        guideH.style.background = 'rgba(255, 100, 100, 0.6)';
+      } else {
+        guideH.style.display = 'none';
+      }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -2317,7 +2636,7 @@
         const dxLogical = (e.clientX - _textDragState.startX) / scaleX;
         const dyLogical = (e.clientY - _textDragState.startY) / scaleY;
 
-        const newOX = Math.max(-0.35, Math.min(0.35, _textDragState.startOffsetX + dxLogical / layout.canvasW));
+        const newOX = Math.max(-TEXT_POS_MAX, Math.min(TEXT_POS_MAX, _textDragState.startOffsetX + dxLogical / layout.canvasW));
         const newOY = Math.max(-0.70, Math.min(0.70, _textDragState.startOffsetY + dyLogical / (layout.bBottom || 1)));
 
         const job = activeJob();
@@ -2364,6 +2683,11 @@
     document.getElementById('btn-text-pos')?.classList.remove('active');
     const handle = document.getElementById('text-pos-handle');
     if (handle) handle.hidden = true;
+    // 隐藏参考线
+    const guideV = document.getElementById('guide-v');
+    const guideH = document.getElementById('guide-h');
+    if (guideV) guideV.style.display = 'none';
+    if (guideH) guideH.style.display = 'none';
   }
 
   function updateTextPosHandle() {
@@ -2396,6 +2720,15 @@
     handle.hidden = false;
     handle.style.left = (canvasRect.left + textCenterX * scaleX) + 'px';
     handle.style.top  = (canvasRect.top  + textCenterY * scaleY) + 'px';
+
+    updateAlignmentGuides(info);
+  }
+
+  function updateAlignmentGuides(info) {
+    const guideV = document.getElementById('guide-v');
+    if (guideV) guideV.style.display = Math.abs(info.textOffsetX || 0) < 0.02 ? 'block' : 'none';
+    const guideH = document.getElementById('guide-h');
+    if (guideH) guideH.style.display = Math.abs(info.textOffsetY || 0) < 0.02 ? 'block' : 'none';
   }
 
   // ══════════════════════════════════════════════════════════════════════════
