@@ -254,6 +254,107 @@
           </div>
         </div>
 
+        <details class="text-advanced" open>
+          <summary>高级文字样式</summary>
+          <div class="text-advanced-body">
+            <div class="form-group">
+              <label>主标题字重</label>
+              <div class="form-row">
+                <select id="font-title-weight">
+                  <option value="300">细体 300</option>
+                  <option value="400" selected>常规 400</option>
+                  <option value="500">中等 500</option>
+                  <option value="600">半粗 600</option>
+                  <option value="700">粗体 700</option>
+                  <option value="800">特粗 800</option>
+                </select>
+                <select id="font-title-style" aria-label="主标题字形">
+                  <option value="normal">常规</option>
+                  <option value="italic">斜体</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>主标题字距</label>
+              <div class="range-row">
+                <input type="range" id="font-title-spacing" min="-0.12" max="0.40" step="0.01" value="0">
+                <span id="title-spacing-label" class="range-value">0.00em</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>副标题字重</label>
+              <div class="form-row">
+                <select id="font-sub-weight">
+                  <option value="300">细体 300</option>
+                  <option value="400" selected>常规 400</option>
+                  <option value="500">中等 500</option>
+                  <option value="600">半粗 600</option>
+                  <option value="700">粗体 700</option>
+                  <option value="800">特粗 800</option>
+                </select>
+                <select id="font-sub-style" aria-label="副标题字形">
+                  <option value="normal">常规</option>
+                  <option value="italic">斜体</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>副标题字距</label>
+              <div class="range-row">
+                <input type="range" id="font-sub-spacing" min="-0.12" max="0.40" step="0.01" value="0.06">
+                <span id="sub-spacing-label" class="range-value">0.06em</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>行间距</label>
+              <div class="range-row">
+                <input type="range" id="font-line-spacing" min="0" max="2" step="0.05" value="0.55">
+                <span id="line-spacing-label" class="range-value">0.55×</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>整体透明度</label>
+              <div class="range-row">
+                <input type="range" id="font-opacity" min="0.05" max="1" step="0.01" value="1">
+                <span id="font-opacity-label" class="range-value">100%</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>旋转角度</label>
+              <div class="range-row">
+                <input type="range" id="font-rotation" min="-180" max="180" step="1" value="0">
+                <span id="font-rotation-label" class="range-value">0°</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>文字描边</label>
+              <div class="form-row text-effect-row">
+                <input type="color" id="font-stroke-color" value="#FFFFFF" title="描边颜色">
+                <input type="range" id="font-stroke-width" min="0" max="0.012" step="0.0005" value="0" title="描边宽度">
+                <span id="font-stroke-label" class="range-value">0.0%</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>文字阴影</label>
+              <div class="form-row text-effect-row">
+                <input type="color" id="font-shadow-color" value="#000000" title="阴影颜色">
+                <input type="range" id="font-shadow-opacity" min="0" max="0.8" step="0.05" value="0" title="阴影透明度">
+                <span id="font-shadow-label" class="range-value">0%</span>
+              </div>
+              <div class="range-row compact-range">
+                <span>模糊</span>
+                <input type="range" id="font-shadow-blur" min="0" max="0.03" step="0.001" value="0.006">
+              </div>
+              <div class="range-row compact-range">
+                <span>X</span>
+                <input type="range" id="font-shadow-x" min="-0.03" max="0.03" step="0.001" value="0.003">
+                <span>Y</span>
+                <input type="range" id="font-shadow-y" min="-0.03" max="0.03" step="0.001" value="0.003">
+              </div>
+            </div>
+          </div>
+        </details>
+
         <div class="section-title">额外文字行</div>
         <div id="extra-lines-list" class="extra-lines-list"></div>
         <button id="btn-add-extra-line" class="btn btn-outline" style="margin-top:2px">+ 添加文字行</button>
@@ -354,6 +455,17 @@
 
       <!-- 边框拖拽调整句柄 -->
       <div id="border-resize-overlay" hidden>
+        <div id="frame-grid" class="frame-grid" aria-hidden="true">
+          <span class="frame-grid-line vertical" data-axis="x" data-ratio="0.333333"></span>
+          <span class="frame-grid-line vertical center" data-axis="x" data-ratio="0.5"></span>
+          <span class="frame-grid-line vertical" data-axis="x" data-ratio="0.666667"></span>
+          <span class="frame-grid-line horizontal" data-axis="y" data-ratio="0.333333"></span>
+          <span class="frame-grid-line horizontal center" data-axis="y" data-ratio="0.5"></span>
+          <span class="frame-grid-line horizontal" data-axis="y" data-ratio="0.666667"></span>
+        </div>
+        <div id="frame-photo-mover" class="frame-photo-mover" title="拖动照片区域">
+          <span>✋ 拖动照片区域</span>
+        </div>
         <!-- 外框：画布边界（琥珀色），拖拽控制整体画布/边框大小 -->
         <div class="br-handle br-corner br-outer" data-corner="tl" data-type="outer"></div>
         <div class="br-handle br-corner br-outer" data-corner="tr" data-type="outer"></div>
@@ -395,11 +507,11 @@
           </svg>
           调整构图
         </button>
-        <button id="btn-text-pos" class="btn-text-pos" hidden title="拖拽调整文字位置">
+        <button id="btn-text-pos" class="btn-text-pos" hidden title="拖动文字、方向键微调；Shift + 方向键快速移动">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
           </svg>
-          文字位置
+          文字工具
         </button>
         <button id="btn-border-resize" class="btn-border-resize" hidden title="拖拽角点调整边框大小">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -407,6 +519,17 @@
           </svg>
           调整边框
         </button>
+        <div id="frame-tools" class="frame-tools" hidden>
+          <button id="btn-frame-grid" class="frame-tool-btn active" type="button" title="显示或隐藏三分网格">网格</button>
+          <button id="btn-frame-snap" class="frame-tool-btn active" type="button" title="拖动时吸附到边缘、中心和三分线">吸附</button>
+          <span class="frame-tool-sep"></span>
+          <button class="frame-align-btn" data-frame-align="left" type="button" title="照片左对齐">左</button>
+          <button class="frame-align-btn" data-frame-align="h-center" type="button" title="照片水平居中">水平居中</button>
+          <button class="frame-align-btn" data-frame-align="right" type="button" title="照片右对齐">右</button>
+          <button class="frame-align-btn" data-frame-align="top" type="button" title="照片顶部对齐">上</button>
+          <button class="frame-align-btn" data-frame-align="v-center" type="button" title="照片垂直居中">垂直居中</button>
+          <button class="frame-align-btn" data-frame-align="bottom" type="button" title="照片底部对齐">下</button>
+        </div>
         <span class="preview-size-info" id="preview-size-info"></span>
       </div>
 

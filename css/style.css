@@ -511,7 +511,6 @@ input[type="checkbox"] { accent-color: var(--accent); }
   max-height: 100%;
   box-shadow: 0 8px 40px rgba(0,0,0,.16);
   border-radius: 2px;
-  transition: width var(--transition), height var(--transition);
 }
 
 /* 渲染指示 */
@@ -895,6 +894,42 @@ input[type="checkbox"] { accent-color: var(--accent); }
   background: rgba(196,169,122,.1);
 }
 
+.text-advanced {
+  margin: 10px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.36);
+  overflow: hidden;
+}
+.text-advanced > summary {
+  padding: 9px 10px;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.text-advanced[open] > summary { border-bottom: 1px solid var(--border); }
+.text-advanced-body { padding: 10px; }
+.text-advanced-body .form-group:last-child { margin-bottom: 0; }
+.range-value {
+  width: 52px;
+  flex: 0 0 52px;
+  color: var(--text-2);
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.text-effect-row { align-items: center; }
+.text-effect-row input[type="color"] { flex: 0 0 34px; width: 34px; }
+.text-effect-row input[type="range"] { min-width: 0; flex: 1; }
+.compact-range { margin-top: 6px; }
+.compact-range > span {
+  min-width: 18px;
+  color: var(--text-3);
+  font-size: 10px;
+}
+
 /* ── 边框调整按钮 ── */
 .btn-border-resize {
   display: inline-flex;
@@ -923,8 +958,58 @@ input[type="checkbox"] { accent-color: var(--accent); }
   z-index: 250;
   pointer-events: none;
 }
+.frame-grid {
+  position: fixed;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity .14s ease;
+}
+.frame-grid.visible { opacity: 1; }
+.frame-grid-line {
+  position: absolute;
+  background: rgba(64, 183, 255, .42);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.18);
+}
+.frame-grid-line.vertical { top: 0; bottom: 0; width: 1px; }
+.frame-grid-line.horizontal { left: 0; right: 0; height: 1px; }
+.frame-grid-line.center { background: rgba(255, 82, 151, .55); }
+.frame-grid-line.snap-active {
+  background: #ff2f92;
+  box-shadow: 0 0 6px rgba(255,47,146,.85);
+}
+.frame-photo-mover {
+  position: fixed;
+  z-index: 1;
+  pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+  background: transparent;
+}
+.frame-photo-mover:active,
+.frame-photo-mover.dragging { cursor: grabbing; }
+.frame-photo-mover > span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20, 28, 34, .72);
+  box-shadow: 0 3px 12px rgba(0,0,0,.22);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .12s ease;
+  pointer-events: none;
+}
+.frame-photo-mover:hover > span,
+.frame-photo-mover.dragging > span { opacity: 1; }
 .br-handle {
   position: fixed;
+  z-index: 2;
   border: 2px solid #fff;
   transform: translate(-50%, -50%);
   pointer-events: all;
@@ -932,6 +1017,33 @@ input[type="checkbox"] { accent-color: var(--accent); }
   touch-action: none;
   transition: background 0.12s;
 }
+
+.frame-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-hover);
+}
+.frame-tool-btn,
+.frame-align-btn {
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  color: var(--text-2);
+  font-size: 11px;
+  background: transparent;
+}
+.frame-tool-btn:hover,
+.frame-align-btn:hover { background: var(--bg-panel); color: var(--text-1); }
+.frame-tool-btn.active {
+  color: #176b9f;
+  background: rgba(74,143,192,.16);
+  box-shadow: inset 0 0 0 1px rgba(74,143,192,.28);
+}
+.frame-tool-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
 
 /* 外框：琥珀/金色 — 画布边界 */
 .br-handle.br-outer { background: rgba(196,162,72,0.92); }

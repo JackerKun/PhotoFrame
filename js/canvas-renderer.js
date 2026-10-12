@@ -12,14 +12,29 @@ window.CanvasRenderer = (() => {
   function getLastLayout() { return _lastLayout; }
 
   // ── 加载图片 ──────────────────────────────────────────────────────────────
+  const imageCache = new Map();
+  const MAX_DECODED_IMAGES = 3;
   function loadImage(file) {
-    return new Promise((resolve, reject) => {
+    if (imageCache.has(file)) {
+      const cached = imageCache.get(file);
+      // Map 的插入顺序作为轻量 LRU，避免浏览大量照片后一直占用解码内存。
+      imageCache.delete(file);
+      imageCache.set(file, cached);
+      return cached;
+    }
+    const pending = new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
       img.src = url;
     });
+    imageCache.set(file, pending);
+    while (imageCache.size > MAX_DECODED_IMAGES) {
+      imageCache.delete(imageCache.keys().next().value);
+    }
+    pending.catch(() => imageCache.delete(file));
+    return pending;
   }
 
   // ── 合并预设与 job 覆盖 ───────────────────────────────────────────────────
@@ -96,6 +111,8 @@ window.CanvasRenderer = (() => {
             size:     Math.max(7, Math.round(shorter * (el.fontSize    || info.subtitleFontSize || 0.026))),
             tracking: el.letterSpacing != null ? el.letterSpacing : 0.04,
             color:    el.color || info.fontColor || '#1A1A1A',
+            weight:   el.fontWeight || info.subtitleFontWeight || 400,
+            style:    el.fontStyle || 'normal',
           });
         }
       }
@@ -115,17 +132,25 @@ window.CanvasRenderer = (() => {
     await ensureFont(info.subtitleFont || 'sans-serif', subtitleSize);
 
     // ── 构建行列表 ──────────────────────────────────────────────────────────
-    // 每行: { text, font, size, tracking, color, isTitle }
+    // 每行: { text, font, size, tracking, color, weight, style, isTitle }
     const lines = [];
-    if (titleText)    lines.push({ text: titleText,    font: info.titleFont    || 'serif',      size: titleSize,    tracking: 0,    color: info.fontColor || '#1A1A1A', isTitle: true  });
-    if (subtitleText) lines.push({ text: subtitleText, font: info.subtitleFont || 'sans-serif', size: subtitleSize, tracking: 0.06, color: info.fontColor || '#1A1A1A', isTitle: false });
+    if (titleText) lines.push({
+      text: titleText, font: info.titleFont || 'serif', size: titleSize,
+      tracking: info.titleLetterSpacing ?? 0, color: info.fontColor || '#1A1A1A',
+      weight: info.titleFontWeight || 400, style: info.titleFontStyle || 'normal', isTitle: true,
+    });
+    if (subtitleText) lines.push({
+      text: subtitleText, font: info.subtitleFont || 'sans-serif', size: subtitleSize,
+      tracking: info.subtitleLetterSpacing ?? 0.06, color: info.fontColor || '#1A1A1A',
+      weight: info.subtitleFontWeight || 400, style: info.subtitleFontStyle || 'normal', isTitle: false,
+    });
     for (const e of extras) lines.push({ ...e, isTitle: false });
 
     if (lines.length === 0) return;
 
     // 行间距：主→副 用 gapPx，其余用 subtitleSize × 0.55
     const interGap = i =>
-      (lines[i].isTitle && lines.length > 1) ? gapPx : subtitleSize * 0.55;
+      (lines[i].isTitle && lines.length > 1) ? gapPx : subtitleSize * (info.lineSpacing ?? 0.55);
 
     // 总布局高度
     let totalH = lines.reduce((s, l) => s + l.size, 0);
@@ -144,35 +169,57 @@ window.CanvasRenderer = (() => {
     else                                 { ctx.textAlign = 'center'; xBase = canvasW / 2;    }
     const xPos = xBase + offsetX;
 
+    const opacity = Math.max(0, Math.min(1, info.textOpacity ?? 1));
+    const rotation = (info.textRotation || 0) * Math.PI / 180;
+    const strokeWidth = Math.max(0, (info.textStrokeWidth || 0) * shorter);
+    const shadowOpacity = Math.max(0, Math.min(1, info.textShadowOpacity || 0));
+
+    ctx.save();
+    ctx.translate(xPos, centerY);
+    if (rotation) ctx.rotate(rotation);
+    ctx.globalAlpha = opacity;
     ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = info.textStrokeColor || '#FFFFFF';
+    if (shadowOpacity > 0) {
+      ctx.shadowColor = colorWithAlpha(info.textShadowColor || '#000000', shadowOpacity);
+      ctx.shadowBlur = Math.max(0, (info.textShadowBlur ?? 0.006) * shorter);
+      ctx.shadowOffsetX = (info.textShadowX ?? 0.003) * shorter;
+      ctx.shadowOffsetY = (info.textShadowY ?? 0.003) * shorter;
+    }
 
     // ── 逐行绘制 ───────────────────────────────────────────────────────────
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      ctx.font      = `${line.size}px "${line.font}"`;
+      ctx.font      = `${line.style} ${line.weight} ${line.size}px "${line.font}"`;
       ctx.fillStyle = line.color;
-      if (line.tracking > 0) {
-        drawTrackedText(ctx, line.text, xPos, curY, line.tracking);
-      } else {
-        ctx.fillText(line.text, xPos, curY);
-      }
+      drawStyledText(ctx, line.text, 0, curY - centerY, line.tracking, line.size, strokeWidth > 0);
       if (i < lines.length - 1) {
         curY += line.size / 2 + lines[i + 1].size / 2 + interGap(i);
       }
     }
+    ctx.restore();
   }
 
-  // 手动实现字符间距（letter-spacing）兼容旧浏览器
-  function drawTrackedText(ctx, text, x, y, trackingEm) {
+  function colorWithAlpha(color, alpha) {
+    if (/^#[0-9a-f]{6}$/i.test(color)) {
+      const n = parseInt(color.slice(1), 16);
+      return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+    }
+    return color;
+  }
+
+  // 字距、描边和填充统一绘制；保留旧浏览器的逐字符降级路径。
+  function drawStyledText(ctx, text, x, y, trackingEm, fontSize, hasStroke) {
     if ('letterSpacing' in ctx) {
-      const fs = parseFloat(ctx.font);
-      ctx.letterSpacing = `${Math.round(fs * trackingEm)}px`;
+      ctx.letterSpacing = `${Math.round(fontSize * trackingEm)}px`;
+      if (hasStroke) ctx.strokeText(text, x, y);
       ctx.fillText(text, x, y);
       ctx.letterSpacing = '0px';
       return;
     }
-    // fallback: measure each char
-    const fontSize = parseFloat(ctx.font);
     const spacing  = fontSize * trackingEm;
     const totalW   = [...text].reduce((s, c) => s + ctx.measureText(c).width + spacing, -spacing);
     const align    = ctx.textAlign;
@@ -181,6 +228,7 @@ window.CanvasRenderer = (() => {
              : x;
     ctx.textAlign = 'left';
     for (const ch of text) {
+      if (hasStroke) ctx.strokeText(ch, curX, y);
       ctx.fillText(ch, curX, y);
       curX += ctx.measureText(ch).width + spacing;
     }
@@ -217,6 +265,21 @@ window.CanvasRenderer = (() => {
     };
   }
 
+  function adaptCropToRatio(crop, imgW, imgH, targetRatio) {
+    if (!crop) return calculateAutoCrop(imgW, imgH, targetRatio);
+    const cx = crop.sx + crop.sw / 2;
+    const cy = crop.sy + crop.sh / 2;
+    let sw = crop.sw;
+    let sh = crop.sh;
+    if (sw / sh > targetRatio) sw = sh * targetRatio;
+    else sh = sw / targetRatio;
+    sw = Math.min(sw, imgW);
+    sh = Math.min(sh, imgH);
+    const sx = Math.max(0, Math.min(imgW - sw, cx - sw / 2));
+    const sy = Math.max(0, Math.min(imgH - sh, cy - sh / 2));
+    return { sx, sy, sw, sh };
+  }
+
   async function render(file, preset, job, outputLongEdge = 0) {
     const img = await loadImage(file);
 
@@ -225,45 +288,64 @@ window.CanvasRenderer = (() => {
 
     // 是否强制画幅比例（预设默认都开启，极简除外）
     const enforceRatio = preset.enforcePhotoRatio !== false;
-    const targetRatio  = enforceRatio
+    let targetRatio  = enforceRatio
       ? (preset.thumb?.photoRatio ?? (srcW / srcH))
       : (srcW / srcH);
 
     // ── 计算照片区域尺寸（输出 canvas 内的照片宽高）──────────────────────
-    let photoW, photoH;
-    if (outputLongEdge > 0) {
-      if (targetRatio >= 1) {
-        photoW = outputLongEdge;
-        photoH = Math.round(outputLongEdge / targetRatio);
-      } else {
-        photoH = outputLongEdge;
-        photoW = Math.round(outputLongEdge * targetRatio);
-      }
-    } else {
-      // 保持源图像素数
-      if (targetRatio >= 1) {
-        photoW = Math.max(srcW, srcH);
-        photoH = Math.round(photoW / targetRatio);
-      } else {
-        photoH = Math.max(srcW, srcH);
-        photoW = Math.round(photoH * targetRatio);
-      }
-    }
-
-    const shorter = Math.min(photoW, photoH);
     const b = effectiveBorder(preset, job);
+    const frame = job?.frameLayout;
+    let photoW, photoH, shorter;
+    let bTop, bBottom, bLeft, bRight;
+    let canvasW, canvasH;
 
-    let bTop    = Math.round(shorter * (b.top    ?? 0.05));
-    let bBottom = Math.round(shorter * (b.bottom ?? 0.22));
-    let bLeft   = Math.round(shorter * (b.left   ?? 0.05));
-    let bRight  = Math.round(shorter * (b.right  ?? 0.05));
-    const radius  = Math.round(shorter * (b.radius ?? 0));
+    if (frame && frame.canvasW > 0 && frame.canvasH > 0 && frame.photoW > 0 && frame.photoH > 0) {
+      // 专业边框模式：画布和照片使用两个独立矩形。调整内框不会改变外画布。
+      const desiredLong = outputLongEdge > 0 ? outputLongEdge : Math.max(srcW, srcH);
+      // 保持既有“照片长边”分辨率语义；内框变化不会导致外画布在松手后跳变。
+      const referenceLong = frame.referencePhotoLong || Math.max(frame.photoW, frame.photoH);
+      const scale = desiredLong / referenceLong;
+      canvasW = Math.max(1, Math.round(frame.canvasW * scale));
+      canvasH = Math.max(1, Math.round(frame.canvasH * scale));
+      bLeft   = Math.max(0, Math.round(frame.photoX * scale));
+      bTop    = Math.max(0, Math.round(frame.photoY * scale));
+      photoW  = Math.max(1, Math.round(frame.photoW * scale));
+      photoH  = Math.max(1, Math.round(frame.photoH * scale));
+      bRight  = Math.max(0, canvasW - bLeft - photoW);
+      bBottom = Math.max(0, canvasH - bTop - photoH);
+      shorter = Math.min(photoW, photoH);
+      targetRatio = photoW / photoH;
+    } else {
+      if (outputLongEdge > 0) {
+        if (targetRatio >= 1) {
+          photoW = outputLongEdge;
+          photoH = Math.round(outputLongEdge / targetRatio);
+        } else {
+          photoH = outputLongEdge;
+          photoW = Math.round(outputLongEdge * targetRatio);
+        }
+      } else {
+        if (targetRatio >= 1) {
+          photoW = Math.max(srcW, srcH);
+          photoH = Math.round(photoW / targetRatio);
+        } else {
+          photoH = Math.max(srcW, srcH);
+          photoW = Math.round(photoH * targetRatio);
+        }
+      }
 
-    let canvasW = photoW + bLeft + bRight;
-    let canvasH = photoH + bTop  + bBottom;
+      shorter = Math.min(photoW, photoH);
+      bTop    = Math.round(shorter * (b.top    ?? 0.05));
+      bBottom = Math.round(shorter * (b.bottom ?? 0.22));
+      bLeft   = Math.round(shorter * (b.left   ?? 0.05));
+      bRight  = Math.round(shorter * (b.right  ?? 0.05));
+      canvasW = photoW + bLeft + bRight;
+      canvasH = photoH + bTop  + bBottom;
+    }
+    const radius = Math.round(shorter * (b.radius ?? 0));
 
     // If preset specifies a target canvas aspect ratio, expand borders to fill
-    if (preset.targetCanvasAspect) {
+    if (!frame && preset.targetCanvasAspect) {
       const targetAspect = preset.targetCanvasAspect; // W / H
       const currentAspect = canvasW / canvasH;
       if (currentAspect > targetAspect) {
@@ -306,7 +388,7 @@ window.CanvasRenderer = (() => {
 
     if (enforceRatio) {
       // 使用用户调整的裁切框，或自动居中
-      const crop = (job && job.cropRect) || calculateAutoCrop(srcW, srcH, targetRatio);
+      const crop = adaptCropToRatio(job && job.cropRect, srcW, srcH, targetRatio);
       ctx.drawImage(img,
         crop.sx, crop.sy, crop.sw, crop.sh,  // 源区域
         bLeft,   bTop,    photoW,  photoH    // 目标区域

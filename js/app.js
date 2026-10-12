@@ -32,6 +32,8 @@
     textPosMode: false,   // 文字位置拖拽模式
     selectedJobIds: new Set(), // 多选胶片条
     borderResizeMode: false,   // 边框拖拽调整模式
+    frameGridEnabled: true,    // 边框编辑三分网格
+    frameSnapEnabled: true,    // 边缘/中心/三分线吸附
   };
 
   let _textDragState = null; // { startX, startY, startOffsetX, startOffsetY }
@@ -39,7 +41,10 @@
 
   let previewDebounce = null;
   let _rafPreview = null;  // 拖拽用 RAF 节流
-  let _lastBorderRenderTime = 0;  // 边框拖拽节流时间戳
+  let _borderRenderInFlight = false;
+  let _borderRenderQueued = false;
+  let _previewGeneration = 0;
+  let _borderOverlaySyncRaf = null;
   let sessionSaveDebounce = null;
   let cropEditorInstance = null;
   let collagePreviewDebounce = null;
@@ -690,6 +695,7 @@
         job.borderOverrides = { ...preset.border };
         job.infoOverrides = { ...preset.infoBar };
       }
+      job.frameLayout = null;
       fillBorderForm(preset, job);
     }
 
@@ -707,6 +713,7 @@
             j.borderOverrides = { ...preset.border };
             j.infoOverrides = { ...preset.infoBar };
           }
+          j.frameLayout = null;
           j.cropRect = null;
         }
       }
@@ -865,6 +872,37 @@
     bindInfoControl('font-title-size',  'titleFontSize',   v => parseFloat(v));
     bindInfoControl('font-sub-size',    'subtitleFontSize',v => parseFloat(v));
     bindInfoControl('font-color',       'fontColor',       v => v);
+    bindInfoControl('font-title-weight','titleFontWeight', v => parseInt(v, 10));
+    bindInfoControl('font-title-style', 'titleFontStyle',  v => v);
+    bindInfoControl('font-title-spacing','titleLetterSpacing', v => parseFloat(v));
+    bindInfoControl('font-sub-weight',  'subtitleFontWeight', v => parseInt(v, 10));
+    bindInfoControl('font-sub-style',   'subtitleFontStyle', v => v);
+    bindInfoControl('font-sub-spacing', 'subtitleLetterSpacing', v => parseFloat(v));
+    bindInfoControl('font-line-spacing','lineSpacing',     v => parseFloat(v));
+    bindInfoControl('font-opacity',     'textOpacity',     v => parseFloat(v));
+    bindInfoControl('font-rotation',    'textRotation',    v => parseFloat(v));
+    bindInfoControl('font-stroke-color','textStrokeColor', v => v);
+    bindInfoControl('font-stroke-width','textStrokeWidth', v => parseFloat(v));
+    bindInfoControl('font-shadow-color','textShadowColor', v => v);
+    bindInfoControl('font-shadow-opacity','textShadowOpacity', v => parseFloat(v));
+    bindInfoControl('font-shadow-blur', 'textShadowBlur',  v => parseFloat(v));
+    bindInfoControl('font-shadow-x',    'textShadowX',     v => parseFloat(v));
+    bindInfoControl('font-shadow-y',    'textShadowY',     v => parseFloat(v));
+
+    const bindTextValueLabel = (inputId, labelId, format) => {
+      const input = document.getElementById(inputId);
+      const label = document.getElementById(labelId);
+      input?.addEventListener('input', () => {
+        if (label) label.textContent = format(parseFloat(input.value));
+      });
+    };
+    bindTextValueLabel('font-title-spacing', 'title-spacing-label', v => `${v.toFixed(2)}em`);
+    bindTextValueLabel('font-sub-spacing', 'sub-spacing-label', v => `${v.toFixed(2)}em`);
+    bindTextValueLabel('font-line-spacing', 'line-spacing-label', v => `${v.toFixed(2)}×`);
+    bindTextValueLabel('font-opacity', 'font-opacity-label', v => `${Math.round(v * 100)}%`);
+    bindTextValueLabel('font-rotation', 'font-rotation-label', v => `${Math.round(v)}°`);
+    bindTextValueLabel('font-stroke-width', 'font-stroke-label', v => `${(v * 100).toFixed(1)}%`);
+    bindTextValueLabel('font-shadow-opacity', 'font-shadow-label', v => `${Math.round(v * 100)}%`);
 
     // 对齐
     document.querySelectorAll('.align-btn').forEach(btn => {
@@ -1123,6 +1161,31 @@
     setVal('font-subtitle',    info.subtitleFont    || 'system-ui');
     setVal('font-title-size',  info.titleFontSize   || 0.038);
     setVal('font-sub-size',    info.subtitleFontSize|| 0.026);
+    setVal('font-title-weight', info.titleFontWeight ?? 400);
+    setVal('font-title-style', info.titleFontStyle || 'normal');
+    setVal('font-title-spacing', info.titleLetterSpacing ?? 0);
+    setVal('font-sub-weight', info.subtitleFontWeight ?? 400);
+    setVal('font-sub-style', info.subtitleFontStyle || 'normal');
+    setVal('font-sub-spacing', info.subtitleLetterSpacing ?? 0.06);
+    setVal('font-line-spacing', info.lineSpacing ?? 0.55);
+    setVal('font-opacity', info.textOpacity ?? 1);
+    setVal('font-rotation', info.textRotation ?? 0);
+    setVal('font-stroke-color', info.textStrokeColor || '#FFFFFF');
+    setVal('font-stroke-width', info.textStrokeWidth ?? 0);
+    setVal('font-shadow-color', info.textShadowColor || '#000000');
+    setVal('font-shadow-opacity', info.textShadowOpacity ?? 0);
+    setVal('font-shadow-blur', info.textShadowBlur ?? 0.006);
+    setVal('font-shadow-x', info.textShadowX ?? 0.003);
+    setVal('font-shadow-y', info.textShadowY ?? 0.003);
+
+    const setTextLabel = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    setTextLabel('title-spacing-label', `${(info.titleLetterSpacing ?? 0).toFixed(2)}em`);
+    setTextLabel('sub-spacing-label', `${(info.subtitleLetterSpacing ?? 0.06).toFixed(2)}em`);
+    setTextLabel('line-spacing-label', `${(info.lineSpacing ?? 0.55).toFixed(2)}×`);
+    setTextLabel('font-opacity-label', `${Math.round((info.textOpacity ?? 1) * 100)}%`);
+    setTextLabel('font-rotation-label', `${Math.round(info.textRotation ?? 0)}°`);
+    setTextLabel('font-stroke-label', `${((info.textStrokeWidth ?? 0) * 100).toFixed(1)}%`);
+    setTextLabel('font-shadow-label', `${Math.round((info.textShadowOpacity ?? 0) * 100)}%`);
 
     const fc = document.getElementById('font-color');
     if (fc) fc.value = info.fontColor || '#1A1A1A';
@@ -1159,6 +1222,25 @@
     const job = activeJob();
     if (!job) return;
     job.borderOverrides[key] = val;
+    if (job.frameLayout && ['top', 'bottom', 'left', 'right'].includes(key)) {
+      const f = job.frameLayout;
+      const shorter = Math.max(1, Math.min(f.photoW, f.photoH));
+      const margin = val * shorter;
+      if (key === 'left') {
+        const right = f.photoX + f.photoW;
+        f.photoX = Math.min(right - 40, margin);
+        f.photoW = right - f.photoX;
+      } else if (key === 'right') {
+        f.photoW = Math.max(40, f.canvasW - margin - f.photoX);
+      } else if (key === 'top') {
+        const bottom = f.photoY + f.photoH;
+        f.photoY = Math.min(bottom - 40, margin);
+        f.photoH = bottom - f.photoY;
+      } else if (key === 'bottom') {
+        f.photoH = Math.max(40, f.canvasH - margin - f.photoY);
+      }
+      syncBorderOverridesFromFrame(job);
+    }
     schedulePreview();
   }
 
@@ -1344,6 +1426,7 @@
   }
 
   async function renderPreview() {
+    const generation = ++_previewGeneration;
     const job = activeJob();
     const preset = activePreset();
     if (!job || !preset) return;
@@ -1355,6 +1438,7 @@
     try {
       const mergedPreset = buildMergedPreset(preset, job);
       const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1400);
+      if (generation !== _previewGeneration || job !== activeJob()) return;
       displayPreview(canvas);
       updateSizeInfo(canvas);
       updateTextPosHandle();   // 文字位置句柄跟随重渲染更新
@@ -1371,18 +1455,26 @@
 
   // 拖拽中强制渲染，不设置 isRendering 标志（避免阻塞后续渲染）
   async function renderPreviewForce() {
-    const job = activeJob();
-    const preset = activePreset();
-    if (!job || !preset) return;
-
+    if (_borderRenderInFlight) { _borderRenderQueued = true; return; }
+    _borderRenderInFlight = true;
     try {
-      const mergedPreset = buildMergedPreset(preset, job);
-      const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1400);
-      displayPreview(canvas);
-      updateSizeInfo(canvas);
-      requestAnimationFrame(updateBorderResizeHandlesDrag);
+      do {
+        _borderRenderQueued = false;
+        const job = activeJob();
+        const preset = activePreset();
+        if (!job || !preset || !_borderDragState) break;
+        const mergedPreset = buildMergedPreset(preset, job);
+        // 拖动中使用较轻的工作预览；松手后 renderPreview 会恢复 1400px 精细预览。
+        const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1000);
+        if (!_borderDragState || job !== activeJob()) continue;
+        displayPreview(canvas);
+        updateSizeInfo(canvas);
+        updateBorderResizeHandlesDrag();
+      } while (_borderRenderQueued);
     } catch (e) {
       console.error('[renderForce] error:', e);
+    } finally {
+      _borderRenderInFlight = false;
     }
   }
 
@@ -1397,7 +1489,15 @@
       preview.height = offscreenCanvas.height;
       const ctx = preview.getContext('2d');
       ctx.drawImage(offscreenCanvas, 0, 0);
-      // 不改变 CSS 尺寸，浏览器自动缩放新像素到锁定 CSS 尺寸
+      const rect = _borderDragState.currentRect || _borderDragState.startRect;
+      preview.style.transform = 'none';
+      preview.style.width = rect.width + 'px';
+      preview.style.height = rect.height + 'px';
+      // preview-wrapper 默认居中；用位移抵消居中重排，让正在拖动的边保持在指针下。
+      const naturalRect = preview.getBoundingClientRect();
+      const tx = rect.left - naturalRect.left;
+      const ty = rect.top - naturalRect.top;
+      preview.style.transform = `translate(${tx}px, ${ty}px)`;
       return;
     }
 
@@ -1430,9 +1530,10 @@
     document.getElementById('btn-zoom-out')?.addEventListener('click', () => changeZoom(-0.2));
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => setZoom('fit'));
 
-    // Scroll-wheel zoom on the preview wrapper
+    // Scroll-wheel zoom on the preview wrapper. Border handles and the photo mover
+    // live in a fixed sibling overlay, so the same handler must be attached there too.
     const wrapper = document.getElementById('preview-wrapper');
-    wrapper?.addEventListener('wheel', e => {
+    const handlePreviewWheel = e => {
       e.preventDefault();
       const canvas = document.getElementById('canvas-preview');
       const delta = e.deltaY < 0 ? 1.1 : 1 / 1.1;
@@ -1450,7 +1551,10 @@
       }
       const next = Math.max(0.2, Math.min(4.0, current * delta));
       setZoom(next);
-    }, { passive: false });
+    };
+    wrapper?.addEventListener('wheel', handlePreviewWheel, { passive: false });
+    document.getElementById('border-resize-overlay')
+      ?.addEventListener('wheel', handlePreviewWheel, { passive: false });
   }
 
   function changeZoom(delta) {
@@ -1483,6 +1587,10 @@
       canvas.style.width  = pxW + 'px';
       canvas.style.height = pxH + 'px';
     }
+
+    // 边框编辑层使用 fixed 定位，不会自动跟随 canvas 的 CSS 尺寸变化。
+    // 排入下一帧，并由 ResizeObserver 兜底处理容器重排造成的尺寸变化。
+    scheduleBorderOverlaySync();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1624,12 +1732,9 @@
     // 若已有自定义裁切，加 dot 提示
     btn.classList.toggle('has-crop', !!(job && job.cropRect));
 
-    // 文字位置按钮：有照片且有信息文字时显示
+    // 文字工具始终随照片显示；即使关闭了信息文字，也能从这里重新启用。
     const btnTP = document.getElementById('btn-text-pos');
-    if (btnTP) {
-      const info = Object.assign({}, preset?.infoBar, job?.infoOverrides || {});
-      btnTP.hidden = !(show && info.enabled !== false);
-    }
+    if (btnTP) btnTP.hidden = !show;
 
     // 边框调整按钮：有照片时显示
     const btnBR = document.getElementById('btn-border-resize');
@@ -2198,6 +2303,118 @@
   // ══════════════════════════════════════════════════════════════════════════
   // 边框拖拽调整
   // ══════════════════════════════════════════════════════════════════════════
+  function ensureFrameLayout(job) {
+    if (job?.frameLayout) return job.frameLayout;
+    const layout = CanvasRenderer.getLastLayout();
+    if (!job || !layout) return null;
+    job.frameLayout = {
+      canvasW: layout.canvasW,
+      canvasH: layout.canvasH,
+      photoX: layout.bLeft,
+      photoY: layout.bTop,
+      photoW: layout.photoW,
+      photoH: layout.photoH,
+      referencePhotoLong: Math.max(layout.photoW, layout.photoH),
+    };
+    return job.frameLayout;
+  }
+
+  function syncBorderOverridesFromFrame(job) {
+    const f = job?.frameLayout;
+    if (!f) return;
+    const shorter = Math.max(1, Math.min(f.photoW, f.photoH));
+    job.borderOverrides = job.borderOverrides || {};
+    job.borderOverrides.left = f.photoX / shorter;
+    job.borderOverrides.top = f.photoY / shorter;
+    job.borderOverrides.right = Math.max(0, f.canvasW - f.photoX - f.photoW) / shorter;
+    job.borderOverrides.bottom = Math.max(0, f.canvasH - f.photoY - f.photoH) / shorter;
+  }
+
+  function syncBorderInputs(job) {
+    ['top', 'bottom', 'left', 'right'].forEach(dir => {
+      const value = job.borderOverrides?.[dir];
+      if (value == null) return;
+      const slider = document.getElementById(`border-${dir}`);
+      const number = document.getElementById(`border-${dir}-num`);
+      if (slider) slider.value = value;
+      if (number) number.value = (value * 100).toFixed(1);
+    });
+  }
+
+  function snapCoordinate(value, targets, threshold) {
+    if (!state.frameSnapEnabled) return { value, target: null };
+    let nearest = null;
+    let distance = threshold + 1;
+    for (const target of targets) {
+      const d = Math.abs(value - target);
+      if (d < distance) { nearest = target; distance = d; }
+    }
+    return distance <= threshold ? { value: nearest, target: nearest } : { value, target: null };
+  }
+
+  function snapMovingRect(position, size, containerSize, threshold) {
+    if (!state.frameSnapEnabled) return { value: position, guide: null };
+    const guides = [0, containerSize / 3, containerSize / 2, containerSize * 2 / 3, containerSize];
+    const anchors = [0, size / 2, size];
+    let best = { value: position, guide: null, distance: threshold + 1 };
+    for (const guide of guides) {
+      for (const anchor of anchors) {
+        const candidate = guide - anchor;
+        const distance = Math.abs(position - candidate);
+        if (distance < best.distance) best = { value: candidate, guide, distance };
+      }
+    }
+    return best.distance <= threshold ? best : { value: position, guide: null };
+  }
+
+  function positionPhotoMover(rect, frame) {
+    const mover = document.getElementById('frame-photo-mover');
+    if (!mover || !rect || !frame) return;
+    const scaleX = rect.width / frame.canvasW;
+    const scaleY = rect.height / frame.canvasH;
+    mover.style.left = (rect.left + frame.photoX * scaleX) + 'px';
+    mover.style.top = (rect.top + frame.photoY * scaleY) + 'px';
+    mover.style.width = (frame.photoW * scaleX) + 'px';
+    mover.style.height = (frame.photoH * scaleY) + 'px';
+  }
+
+  function updateFrameGrid(rect, frame, snapX = null, snapY = null) {
+    const grid = document.getElementById('frame-grid');
+    if (!grid || !rect || !frame) return;
+    grid.style.left = rect.left + 'px';
+    grid.style.top = rect.top + 'px';
+    grid.style.width = rect.width + 'px';
+    grid.style.height = rect.height + 'px';
+    grid.classList.toggle('visible', state.frameGridEnabled || snapX != null || snapY != null);
+    grid.querySelectorAll('.frame-grid-line').forEach(line => {
+      const ratio = Number(line.dataset.ratio);
+      if (line.dataset.axis === 'x') {
+        line.style.left = (ratio * 100) + '%';
+        line.classList.toggle('snap-active', snapX != null && Math.abs(snapX / frame.canvasW - ratio) < 0.002);
+      } else {
+        line.style.top = (ratio * 100) + '%';
+        line.classList.toggle('snap-active', snapY != null && Math.abs(snapY / frame.canvasH - ratio) < 0.002);
+      }
+    });
+  }
+
+  function queueBorderPreview() {
+    if (_rafPreview) return;
+    _rafPreview = requestAnimationFrame(() => {
+      _rafPreview = null;
+      renderPreviewForce();
+    });
+  }
+
+  function scheduleBorderOverlaySync() {
+    if ((!state.borderResizeMode && !state.textPosMode) || _borderDragState || _borderOverlaySyncRaf) return;
+    _borderOverlaySyncRaf = requestAnimationFrame(() => {
+      _borderOverlaySyncRaf = null;
+      if (state.borderResizeMode && !_borderDragState) updateBorderResizeHandles();
+      if (state.textPosMode) updateTextPosHandle();
+    });
+  }
+
   function setupBorderResizeMode() {
     const btn = document.getElementById('btn-border-resize');
     btn?.addEventListener('click', () => {
@@ -2205,132 +2422,171 @@
       else enterBorderResizeMode();
     });
 
-    // ── 拖拽处理函数（先定义，后注册）───
     const onBorderDragMove = (e) => {
       if (!_borderDragState) return;
-      const { shorter, initialScaleX, initialScaleY } = _borderDragState;
-      const dxL = (e.clientX - _borderDragState.startX) / initialScaleX;
-      const dyL = (e.clientY - _borderDragState.startY) / initialScaleY;
-
+      e.preventDefault();
+      const drag = _borderDragState;
       const job = activeJob();
       if (!job) return;
+      const start = drag.startFrame;
+      const frame = { ...start };
+      const dx = (e.clientX - drag.startX) / drag.initialScaleX;
+      const dy = (e.clientY - drag.startY) / drag.initialScaleY;
+      const movesLeft = drag.corner.includes('l');
+      const movesRight = drag.corner.includes('r');
+      const movesTop = drag.corner.includes('t');
+      const movesBottom = drag.corner.includes('b');
+      const minPhoto = 40;
+      drag.snapX = null;
+      drag.snapY = null;
 
-      const { corner, type, startBTop, startBBottom, startBLeft, startBRight } = _borderDragState;
-      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      if (drag.type === 'move') {
+        const snappedX = snapMovingRect(start.photoX + dx, start.photoW, start.canvasW, 8 / drag.initialScaleX);
+        const snappedY = snapMovingRect(start.photoY + dy, start.photoH, start.canvasH, 8 / drag.initialScaleY);
+        frame.photoX = Math.max(0, Math.min(start.canvasW - start.photoW, snappedX.value));
+        frame.photoY = Math.max(0, Math.min(start.canvasH - start.photoH, snappedY.value));
+        frame.photoW = start.photoW;
+        frame.photoH = start.photoH;
+        drag.snapX = snappedX.guide;
+        drag.snapY = snappedY.guide;
+      } else if (drag.type === 'inner') {
+        const xTargets = [0, start.canvasW / 3, start.canvasW / 2, start.canvasW * 2 / 3, start.canvasW];
+        const yTargets = [0, start.canvasH / 3, start.canvasH / 2, start.canvasH * 2 / 3, start.canvasH];
+        const thresholdX = 8 / drag.initialScaleX;
+        const thresholdY = 8 / drag.initialScaleY;
+        let left = start.photoX;
+        let right = start.photoX + start.photoW;
+        let top = start.photoY;
+        let bottom = start.photoY + start.photoH;
 
-      if (corner === 'tl' || corner === 'tr' || corner === 'bl' || corner === 'br') {
-        let proj;
-        if      (corner === 'tl') proj = (-dxL - dyL) / 2;
-        else if (corner === 'tr') proj = ( dxL - dyL) / 2;
-        else if (corner === 'bl') proj = (-dxL + dyL) / 2;
-        else                      proj = ( dxL + dyL) / 2;
-        const delta = proj / shorter;
-        const sign = type === 'inner' ? -1 : 1;
-        job.borderOverrides.top    = clamp(startBTop    + sign * delta, 0, 0.60);
-        job.borderOverrides.bottom = clamp(startBBottom + sign * delta, 0, 0.60);
-        job.borderOverrides.left   = clamp(startBLeft   + sign * delta, 0, 0.60);
-        job.borderOverrides.right  = clamp(startBRight  + sign * delta, 0, 0.60);
-      } else {
-        if (type === 'outer') {
-          if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    - dyL / shorter, 0, 0.60);
-          else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom + dyL / shorter, 0, 0.60);
-          else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   - dxL / shorter, 0, 0.60);
-          else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  + dxL / shorter, 0, 0.60);
-        } else {
-          if      (corner === 't') job.borderOverrides.top    = clamp(startBTop    + dyL / shorter, 0, 0.60);
-          else if (corner === 'b') job.borderOverrides.bottom = clamp(startBBottom - dyL / shorter, 0, 0.60);
-          else if (corner === 'l') job.borderOverrides.left   = clamp(startBLeft   + dxL / shorter, 0, 0.60);
-          else if (corner === 'r') job.borderOverrides.right  = clamp(startBRight  - dxL / shorter, 0, 0.60);
+        if (movesLeft) {
+          const snapped = snapCoordinate(start.photoX + dx, [...xTargets, start.canvasW - right], thresholdX);
+          left = Math.max(0, Math.min(right - minPhoto, snapped.value));
+          drag.snapX = snapped.target;
         }
+        if (movesRight) {
+          const snapped = snapCoordinate(right + dx, [...xTargets, start.canvasW - left], thresholdX);
+          right = Math.min(start.canvasW, Math.max(left + minPhoto, snapped.value));
+          drag.snapX = snapped.target;
+        }
+        if (movesTop) {
+          const snapped = snapCoordinate(start.photoY + dy, [...yTargets, start.canvasH - bottom], thresholdY);
+          top = Math.max(0, Math.min(bottom - minPhoto, snapped.value));
+          drag.snapY = snapped.target;
+        }
+        if (movesBottom) {
+          const snapped = snapCoordinate(bottom + dy, [...yTargets, start.canvasH - top], thresholdY);
+          bottom = Math.min(start.canvasH, Math.max(top + minPhoto, snapped.value));
+          drag.snapY = snapped.target;
+        }
+        frame.photoX = left;
+        frame.photoY = top;
+        frame.photoW = right - left;
+        frame.photoH = bottom - top;
+      } else {
+        if (movesLeft) {
+          const maxDelta = start.photoX;
+          const delta = Math.min(maxDelta, dx);
+          frame.canvasW = start.canvasW - delta;
+          frame.photoX = start.photoX - delta;
+        }
+        if (movesRight) frame.canvasW = Math.max(start.photoX + start.photoW, start.canvasW + dx);
+        if (movesTop) {
+          const maxDelta = start.photoY;
+          const delta = Math.min(maxDelta, dy);
+          frame.canvasH = start.canvasH - delta;
+          frame.photoY = start.photoY - delta;
+        }
+        if (movesBottom) frame.canvasH = Math.max(start.photoY + start.photoH, start.canvasH + dy);
       }
 
-      ['top', 'bottom', 'left', 'right'].forEach(dir => {
-        const v = job.borderOverrides[dir];
-        if (v === undefined) return;
-        const s = document.getElementById(`border-${dir}`);
-        const n = document.getElementById(`border-${dir}-num`);
-        if (s) s.value = v;
-        if (n) n.value = (v * 100).toFixed(1);
-      });
-
+      job.frameLayout = frame;
+      syncBorderOverridesFromFrame(job);
+      syncBorderInputs(job);
+      if (drag.type === 'outer') {
+        drag.currentRect = {
+          left: movesLeft ? drag.startRect.right - frame.canvasW * drag.initialScaleX : drag.startRect.left,
+          top: movesTop ? drag.startRect.bottom - frame.canvasH * drag.initialScaleY : drag.startRect.top,
+          width: frame.canvasW * drag.initialScaleX,
+          height: frame.canvasH * drag.initialScaleY,
+        };
+      } else {
+        drag.currentRect = drag.startRect;
+      }
       scheduleSessionSave();
       updateBorderResizeHandlesDrag();
-
-      const _now = performance.now();
-      if (_now - _lastBorderRenderTime > 80) {
-        _lastBorderRenderTime = _now;
-        if (_rafPreview) cancelAnimationFrame(_rafPreview);
-        _rafPreview = requestAnimationFrame(() => {
-          _rafPreview = null;
-          renderPreviewForce();
-        });
-      }
+      queueBorderPreview();
     };
 
-    const onBorderDragEnd = () => {
+    const onBorderDragEnd = (e) => {
       if (!_borderDragState) return;
       if (_rafPreview) { cancelAnimationFrame(_rafPreview); _rafPreview = null; }
-      const preType = _borderDragState.type;
-      const preCorner = _borderDragState.corner;
+      if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       _borderDragState = null;
-      _lastBorderRenderTime = 0;
+      document.body.classList.remove('border-frame-dragging');
+      document.getElementById('frame-photo-mover')?.classList.remove('dragging');
       renderPreview();
     };
 
-    // ── 句柄事件（pointerdown 启动拖拽）───
+    const beginFrameDrag = (e, type, corner, target) => {
+      if (!state.borderResizeMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const layout = CanvasRenderer.getLastLayout();
+      const job = activeJob();
+      if (!layout || !job || !activePreset()) return;
+      const frame = ensureFrameLayout(job);
+      const canvas = document.getElementById('canvas-preview');
+      if (!frame || !canvas) return;
+      ++_previewGeneration;
+      target.setPointerCapture(e.pointerId);
+      const startRect = canvas.getBoundingClientRect();
+      canvas.style.width = canvas.offsetWidth + 'px';
+      canvas.style.height = canvas.offsetHeight + 'px';
+      canvas.style.maxWidth = 'none';
+      canvas.style.maxHeight = 'none';
+      _borderDragState = {
+        corner,
+        type,
+        startX: e.clientX,
+        startY: e.clientY,
+        startRect,
+        currentRect: startRect,
+        startFrame: { ...frame },
+        initialScaleX: startRect.width / frame.canvasW,
+        initialScaleY: startRect.height / frame.canvasH,
+        snapX: null,
+        snapY: null,
+      };
+      document.body.classList.add('border-frame-dragging');
+      if (type === 'move') target.classList.add('dragging');
+    };
+
     document.querySelectorAll('.br-handle').forEach(handle => {
       handle.addEventListener('pointerdown', (e) => {
-        if (!state.borderResizeMode) return;
-        e.preventDefault();
-        handle.setPointerCapture(e.pointerId);
-
-        const corner = handle.dataset.corner;
-        const layout = CanvasRenderer.getLastLayout();
-        const job    = activeJob();
-        const preset = activePreset();
-        if (!layout || !job || !preset) return;
-
-        const b = Object.assign({}, preset.border, job.borderOverrides || {});
-        const cvs = document.getElementById('canvas-preview');
-        const startRect = cvs ? cvs.getBoundingClientRect() : { left: 0, top: 0, width: 100, height: 100 };
-
-        if (cvs) {
-          cvs.style.width     = cvs.offsetWidth + 'px';
-          cvs.style.height    = cvs.offsetHeight + 'px';
-          cvs.style.maxWidth  = 'none';
-          cvs.style.maxHeight = 'none';
-        }
-
-        _borderDragState = {
-          corner,
-          type:          handle.dataset.type,
-          startX:        e.clientX,
-          startY:        e.clientY,
-          startBTop:     b.top    ?? 0.05,
-          startBBottom:  b.bottom ?? 0.22,
-          startBLeft:    b.left   ?? 0.05,
-          startBRight:   b.right  ?? 0.05,
-          startRect,
-          photoW:        layout.photoW,
-          photoH:        layout.photoH,
-          shorter:       layout.shorter,
-          presetBorder:  Object.assign({}, preset.border),
-          initialScaleX: startRect.width  / (layout.canvasW || 1),
-          initialScaleY: startRect.height / (layout.canvasH || 1),
-        };
-        _lastBorderRenderTime = 0;
+        beginFrameDrag(e, handle.dataset.type, handle.dataset.corner, handle);
       });
 
-      // pointer 事件（真实浏览器：pointer capture 确保事件路由到句柄）
       handle.addEventListener('pointermove', onBorderDragMove);
       handle.addEventListener('pointerup', onBorderDragEnd);
+      handle.addEventListener('pointercancel', onBorderDragEnd);
     });
 
-    // ── window 级别事件（Playwright 兼容 + pointer capture 兜底）───
-    window.addEventListener('mousemove', onBorderDragMove);
-    window.addEventListener('mouseup', onBorderDragEnd);
-    window.addEventListener('pointermove', onBorderDragMove);
-    window.addEventListener('pointerup', onBorderDragEnd);
+    const mover = document.getElementById('frame-photo-mover');
+    mover?.addEventListener('pointerdown', e => beginFrameDrag(e, 'move', 'move', mover));
+    mover?.addEventListener('pointermove', onBorderDragMove);
+    mover?.addEventListener('pointerup', onBorderDragEnd);
+    mover?.addEventListener('pointercancel', onBorderDragEnd);
+
+    // Canvas 尺寸变化时重新定位内外框、网格和抓手；滚动预览区时
+    // 也需要同步使用 fixed 定位的编辑浮层。
+    const previewCanvas = document.getElementById('canvas-preview');
+    const previewWrapper = document.getElementById('preview-wrapper');
+    if (previewCanvas && typeof ResizeObserver !== 'undefined') {
+      const borderOverlayObserver = new ResizeObserver(scheduleBorderOverlaySync);
+      borderOverlayObserver.observe(previewCanvas);
+    }
+    previewWrapper?.addEventListener('scroll', scheduleBorderOverlaySync, { passive: true });
 
     // 浏览器窗口缩放时重新定位
     let resizeRaf = null;
@@ -2339,11 +2595,35 @@
       if (resizeRaf) cancelAnimationFrame(resizeRaf);
       resizeRaf = requestAnimationFrame(() => {
         resizeRaf = null;
-        if (_borderDragState) {
-          const cvs = document.getElementById('canvas-preview');
-          if (cvs) _borderDragState.lockedRect = cvs.getBoundingClientRect();
-        }
         updateBorderResizeHandles();
+      });
+    });
+
+    document.getElementById('btn-frame-grid')?.addEventListener('click', e => {
+      state.frameGridEnabled = !state.frameGridEnabled;
+      e.currentTarget.classList.toggle('active', state.frameGridEnabled);
+      updateBorderResizeHandles();
+    });
+    document.getElementById('btn-frame-snap')?.addEventListener('click', e => {
+      state.frameSnapEnabled = !state.frameSnapEnabled;
+      e.currentTarget.classList.toggle('active', state.frameSnapEnabled);
+    });
+    document.querySelectorAll('.frame-align-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const job = activeJob();
+        const f = ensureFrameLayout(job);
+        if (!job || !f) return;
+        const action = button.dataset.frameAlign;
+        if (action === 'left') f.photoX = 0;
+        if (action === 'h-center') f.photoX = (f.canvasW - f.photoW) / 2;
+        if (action === 'right') f.photoX = f.canvasW - f.photoW;
+        if (action === 'top') f.photoY = 0;
+        if (action === 'v-center') f.photoY = (f.canvasH - f.photoH) / 2;
+        if (action === 'bottom') f.photoY = f.canvasH - f.photoH;
+        syncBorderOverridesFromFrame(job);
+        syncBorderInputs(job);
+        scheduleSessionSave();
+        renderPreview();
       });
     });
   }
@@ -2354,22 +2634,15 @@
     if (!overlay || !_borderDragState || !state.borderResizeMode) return;
 
     const job    = activeJob();
-    const preset = activePreset();
-    if (!job || !preset) return;
-
-    const { lockedRect, photoW, photoH, shorter, presetBorder } = _borderDragState;
-    const b = Object.assign({}, presetBorder, job.borderOverrides || {});
-
-    const bTop    = Math.round(shorter * (b.top    ?? 0.05));
-    const bBottom = Math.round(shorter * (b.bottom ?? 0.22));
-    const bLeft   = Math.round(shorter * (b.left   ?? 0.05));
-    const bRight  = Math.round(shorter * (b.right  ?? 0.05));
-    const canvasW = photoW + bLeft + bRight;
-    const canvasH = photoH + bTop  + bBottom;
-
-    const scaleX = lockedRect.width  / canvasW;
-    const scaleY = lockedRect.height / canvasH;
-    const rect   = lockedRect;  // 整个拖拽期间保持不变
+    const f = job?.frameLayout;
+    if (!f) return;
+    const rect = _borderDragState.currentRect || _borderDragState.startRect;
+    const scaleX = rect.width / f.canvasW;
+    const scaleY = rect.height / f.canvasH;
+    const canvasW = f.canvasW, canvasH = f.canvasH;
+    const bLeft = f.photoX, bTop = f.photoY;
+    const photoW = f.photoW, photoH = f.photoH;
+    positionPhotoMover(rect, f);
 
     // 外框句柄位置
     const ocx = canvasW / 2, ocy = canvasH / 2;
@@ -2419,7 +2692,7 @@
     });
 
     // 对称参考线
-    const bForGuide = Object.assign({}, preset.border, job.borderOverrides || {});
+    const bForGuide = job.borderOverrides || {};
 
     const hDiff = Math.abs(bForGuide.left - bForGuide.right);
     const guideV = document.getElementById('guide-v');
@@ -2439,14 +2712,19 @@
     if (leftLabel) leftLabel.textContent = `左 ${(bForGuide.left * 100).toFixed(1)}%`;
     if (rightLabel) rightLabel.textContent = `右 ${(bForGuide.right * 100).toFixed(1)}%`;
 
-    requestAnimationFrame(updateBorderResizeHandles);
+    updateFrameGrid(rect, f, _borderDragState.snapX, _borderDragState.snapY);
   }
 
   function enterBorderResizeMode() {
+    if (state.textPosMode) exitTextPosMode();
     state.borderResizeMode = true;
     document.getElementById('btn-border-resize')?.classList.add('active');
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = false;
+    const tools = document.getElementById('frame-tools');
+    if (tools) tools.hidden = false;
+    document.getElementById('btn-frame-grid')?.classList.toggle('active', state.frameGridEnabled);
+    document.getElementById('btn-frame-snap')?.classList.toggle('active', state.frameSnapEnabled);
     updateBorderResizeHandles();
   }
 
@@ -2455,7 +2733,13 @@
     document.getElementById('btn-border-resize')?.classList.remove('active');
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = true;
+    const tools = document.getElementById('frame-tools');
+    if (tools) tools.hidden = true;
+    document.getElementById('frame-grid')?.classList.remove('visible');
     _borderDragState = null;
+    document.body.classList.remove('border-frame-dragging');
+    const preview = document.getElementById('canvas-preview');
+    if (preview) preview.style.transform = '';
 
     // Reset alignment guides
     const guideV = document.getElementById('guide-v');
@@ -2483,6 +2767,9 @@
     const scaleY = rect.height / (canvas.height || 1);
 
     const { canvasW, canvasH, bLeft, bTop, photoW, photoH } = layout;
+    const frameForGrid = activeJob()?.frameLayout || { canvasW, canvasH, photoX: bLeft, photoY: bTop, photoW, photoH };
+    updateFrameGrid(rect, frameForGrid);
+    positionPhotoMover(rect, frameForGrid);
 
     // ── 外框：画布边界 ─────────────────────────────────────────────────────
     const ocx = canvasW / 2;
@@ -2601,7 +2888,17 @@
     const btn = document.getElementById('btn-text-pos');
     btn?.addEventListener('click', () => {
       if (state.textPosMode) exitTextPosMode();
-      else enterTextPosMode();
+      else {
+        const job = activeJob();
+        if (job) {
+          job.infoOverrides = job.infoOverrides || {};
+          job.infoOverrides.enabled = true;
+          const toggle = document.getElementById('info-toggle');
+          if (toggle) toggle.checked = true;
+        }
+        enterTextPosMode();
+        schedulePreview();
+      }
     });
 
     const handle = document.getElementById('text-pos-handle');
@@ -2668,11 +2965,29 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && state.textPosMode && !state.cropMode && !state.slotCropMode) {
         exitTextPosMode();
+        return;
       }
+      if (!state.textPosMode || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      if (/input|textarea|select/i.test(document.activeElement?.tagName || '')) return;
+      const job = activeJob();
+      const layout = CanvasRenderer.getLastLayout();
+      if (!job || !layout) return;
+      e.preventDefault();
+      job.infoOverrides = job.infoOverrides || {};
+      const step = e.shiftKey ? 10 : 1;
+      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+      const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+      job.infoOverrides.textOffsetX = Math.max(-TEXT_POS_MAX, Math.min(TEXT_POS_MAX,
+        (job.infoOverrides.textOffsetX || 0) + dx / Math.max(1, layout.canvasW)));
+      job.infoOverrides.textOffsetY = Math.max(-0.7, Math.min(0.7,
+        (job.infoOverrides.textOffsetY || 0) + dy / Math.max(1, layout.bBottom || 1)));
+      fillBorderForm(activePreset(), job);
+      schedulePreviewNow();
     });
   }
 
   function enterTextPosMode() {
+    if (state.borderResizeMode) exitBorderResizeMode();
     state.textPosMode = true;
     document.getElementById('btn-text-pos')?.classList.add('active');
     updateTextPosHandle();
