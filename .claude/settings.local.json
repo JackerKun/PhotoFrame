@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls /Users/jackerkun/Pictures/素材/Frame/输出模板/大六寸排版\\\\\\(135\\\\\\)/ 2>/dev/null)",
-      "Bash(ls /Users/jackerkun/Pictures/素材/Frame/输出模板/7寸排版\\\\\\(645\\\\\\)/ 2>/dev/null && ls /Users/jackerkun/Pictures/素材/Frame/输出模板/8寸排版\\\\\\(67\\\\\\)/ 2>/dev/null)"
+      "Bash(ls /Users/jackerkun/Pictures/素材/Frame/输出模板/7寸排版\\\\\\(645\\\\\\)/ 2>/dev/null && ls /Users/jackerkun/Pictures/素材/Frame/输出模板/8寸排版\\\\\\(67\\\\\\)/ 2>/dev/null)",
+      "WebSearch"
     ]
   }
 }

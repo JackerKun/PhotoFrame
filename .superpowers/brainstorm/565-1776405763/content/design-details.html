@@ -1,0 +1,39 @@
+<h2>设计方案 — 具体文件修改</h2>
+<p class="subtitle">方案 A：需要修改的文件和影响范围</p>
+
+<div class="section">
+  <h3>文件清单</h3>
+  <div style="background:#f5f5f5;padding:12px;border-radius:4px;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ddd;">文件</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ddd;">修改内容</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid #ddd;">影响</th></tr>
+      <tr><td style="padding:4px 8px;">js/app.js</td><td style="padding:4px 8px;">1. buildMergedPreset 补全 infoBar<br>2. setupPresetSave 增加类型选择<br>3. applyPresetToJob 增加 presetType 判断<br>4. setupBorderResizeMode 松手行为修复</td><td style="padding:4px 8px;">核心逻辑修改</td></tr>
+      <tr><td style="padding:4px 8px;">js/storage.js</td><td style="padding:4px 8px;">saveCustomPreset 增加 presetType 字段存储</td><td style="padding:4px 8px;">数据模型扩展</td></tr>
+      <tr><td style="padding:4px 8px;">index.html</td><td style="padding:4px 8px;">保存预设弹窗增加类型选择 UI</td><td style="padding:4px 8px;">UI 变更</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h3>关键代码变更</h3>
+  <div style="background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:6px;font-size:11px;font-family:monospace;">
+    // buildMergedPreset 补全合并<br>
+    function buildMergedPreset(preset, job) {<br>
+    &nbsp;&nbsp;// ... existing border merge ...<br>
+    &nbsp;&nbsp;const mergedInfo = Object.assign({}, preset.infoBar, job.infoOverrides);<br>
+    &nbsp;&nbsp;// 确保所有字段被合并<br>
+    &nbsp;&nbsp;['titleFontSize','subtitleFontSize','fontColor','textAlign','extraLines',<br>
+    &nbsp;&nbsp;&nbsp;'titleFont','subtitleFont','titleGap','textOffsetX','textOffsetY'].forEach(k => {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (job.infoOverrides[k] !== undefined) mergedInfo[k] = job.infoOverrides[k];<br>
+    &nbsp;&nbsp;});<br>
+    &nbsp;&nbsp;// ...<br>
+    }<br><br>
+    // 松手行为修复<br>
+    handle.addEventListener('pointerup', e => {<br>
+    &nbsp;&nbsp;if (!_borderDragState) return;<br>
+    &nbsp;&nbsp;const { savedZoom, cvsEl } = _borderDragState;<br>
+    &nbsp;&nbsp;cvsEl.style.width = ''; cvsEl.style.height = ''; // 解锁<br>
+    &nbsp;&nbsp;_borderDragState = null;<br>
+    &nbsp;&nbsp;requestAnimationFrame(() => schedulePreview()); // 仅重绘，不重布局<br>
+    });
+  </div>
+</div>

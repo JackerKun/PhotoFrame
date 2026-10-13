@@ -1,0 +1,27 @@
+{
+  "name": "photoframe",
+  "version": "1.0.0",
+  "description": "> 胶片照片加边框排版工具，专为胶片摄影爱好者打造。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackerKun/PhotoFrame.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/JackerKun/PhotoFrame/issues"
+  },
+  "homepage": "https://github.com/JackerKun/PhotoFrame#readme",
+  "dependencies": {
+    "playwright": "^1.59.1"
+  }
+}

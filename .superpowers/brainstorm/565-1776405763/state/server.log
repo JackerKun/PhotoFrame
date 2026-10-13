@@ -1,0 +1,7 @@
+{"type":"server-started","port":49356,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:49356","screen_dir":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content","state_dir":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/state"}
+{"type":"screen-added","file":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content/overview.html"}
+{"type":"screen-added","file":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content/preset-choice.html"}
+{"type":"screen-added","file":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content/design-architecture.html"}
+{"type":"screen-added","file":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content/design-details.html"}
+{"type":"screen-added","file":"/Users/jackerkun/Projects/PhotoTools/PhotoFrame/.superpowers/brainstorm/565-1776405763/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

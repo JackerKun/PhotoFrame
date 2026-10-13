@@ -1,0 +1,27 @@
+<h2>设计方案 — 架构与数据流</h2>
+<p class="subtitle">方案 A：轻量修复，两个核心问题</p>
+
+<div class="section">
+  <h3>预设保存改造</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:8px;">
+    当前 buildMergedPreset 只合并 border + infoBar 基础字段，丢失 titleFontSize 等。
+  </p>
+  <div style="background:#f5f5f5;padding:12px;border-radius:4px;font-size:12px;font-family:monospace;">
+    buildMergedPreset() → 合并所有 infoBar 字段<br>
+    &nbsp;&nbsp;→ 弹窗增加类型选择：[仅边框] [完整预设]<br>
+    &nbsp;&nbsp;→ 保存到 localStorage 时区分 presetType: 'style' | 'full'<br>
+    &nbsp;&nbsp;→ 应用预设时，根据 presetType 决定是否覆盖 infoBar
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h3>边框拖拽修复</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:8px;">
+    当前松手后 setZoom(savedZoom) 触发 applyZoom → 重新计算 layout → 画布跳变。
+  </p>
+  <div style="background:#f5f5f5;padding:12px;border-radius:4px;font-size:12px;font-family:monospace;">
+    pointerup → 解锁 canvas CSS → 清除拖拽状态<br>
+    &nbsp;&nbsp;→ requestAnimationFrame(重绘一次)<br>
+    &nbsp;&nbsp;→ 不调用 setZoom，canvas 尺寸不变，仅更新 CanvasRenderer 内部像素
+  </div>
+</div>

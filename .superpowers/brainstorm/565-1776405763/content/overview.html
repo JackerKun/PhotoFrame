@@ -1,0 +1,79 @@
+<h2>PhotoFrame 当前界面架构</h2>
+<p class="subtitle">灰色区域 = 待改进的问题点</p>
+
+<div class="mockup">
+  <div class="mockup-header">PhotoFrame 界面布局</div>
+  <div class="mockup-body" style="padding:16px;">
+    <!-- 顶部栏 -->
+    <div style="background:#e8e8e8;padding:8px 16px;border-radius:4px;margin-bottom:12px;font-size:13px;">
+      📁 上传区 | 🔧 工具栏（保存预设 / 边框调整 / 文字位置 / 清空会话）
+    </div>
+
+    <div style="display:flex;gap:12px;">
+      <!-- 左侧面板 -->
+      <div style="width:280px;flex-shrink:0;">
+        <div class="label" style="margin-bottom:6px;">左侧面板</div>
+        <div style="background:#f5f5f5;padding:12px;border-radius:4px;font-size:12px;line-height:1.8;">
+          <b>预设标签</b><br>
+          ├ 分类导航（全部/135/120/...）<br>
+          ├ 预设网格（点击选择）<br>
+          └ <span style="background:#ffe0b2;padding:1px 4px;border-radius:2px;">⚠ 保存预设：不保存 infoBar 字段</span><br><br>
+          <b>信息标签</b><br>
+          ├ 主标题模板 / 副标题模板<br>
+          ├ 字体选择 / 字号 / 字色<br>
+          ├ 对齐方式<br>
+          └ 额外文字行<br><br>
+          <b>边框标签</b><br>
+          ├ 四边滑块（上/下/左/右）<br>
+          ├ 圆角 / 背景色<br>
+          └ <span style="background:#ffe0b2;padding:1px 4px;border-radius:2px;">⚠ 拖拽松手后画布重新缩放</span><br><br>
+          <b>导出标签</b><br>
+          ├ 格式 / 质量 / 长边<br>
+          └ 单张导出 / 批量 ZIP
+        </div>
+      </div>
+
+      <!-- 右侧预览 -->
+      <div style="flex:1;">
+        <div class="label" style="margin-bottom:6px;">右侧预览区</div>
+        <div style="background:#fff;border:2px solid #ddd;border-radius:6px;height:280px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="text-align:center;color:#999;">
+            <div style="font-size:40px;margin-bottom:8px;">🖼</div>
+            <div style="font-size:13px;">Canvas 预览区域</div>
+            <div style="font-size:11px;margin-top:4px;">缩放: fit / 100% / 200%</div>
+          </div>
+          <!-- 模拟边框拖拽句柄 -->
+          <div style="position:absolute;top:10px;left:10px;width:16px;height:16px;background:#ff5722;border-radius:50%;opacity:0.7;"></div>
+          <div style="position:absolute;top:10px;right:10px;width:16px;height:16px;background:#ff5722;border-radius:50%;opacity:0.7;"></div>
+          <div style="position:absolute;bottom:10px;left:10px;width:16px;height:16px;background:#ff5722;border-radius:50%;opacity:0.7;"></div>
+          <div style="position:absolute;bottom:10px;right:10px;width:16px;height:16px;background:#ff5722;border-radius:50%;opacity:0.7;"></div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#888;">
+          底部：胶片条（多张缩略图，可多选）
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>你提到的两个核心问题</h3>
+  <div class="pros-cons">
+    <div class="cons">
+      <h4>问题 1：保存预设不完整</h4>
+      <ul>
+        <li>当前只保存 border + infoBar 基础字段</li>
+        <li><b>不保存</b>：titleFontSize、subtitleFontSize、fontColor、textAlign、extraLines</li>
+        <li>结果：应用预设时信息字段丢失，无法实现「多张照片同步一模一样」</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>问题 2：边框拖拽松手后重新缩放</h4>
+      <ul>
+        <li>拖拽时锁定了 canvas 尺寸</li>
+        <li>松手后调用 setZoom → applyZoom 重新布局</li>
+        <li>导致画布大小跳变，体验断裂</li>
+      </ul>
+    </div>
+  </div>
+</div>
