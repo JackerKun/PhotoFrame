@@ -357,20 +357,35 @@ window.CollageRenderer = (() => {
    * @returns {Promise<HTMLCanvasElement>}
    */
   async function render(layout, cells, infoOverride = {}, outputLongEdge = 3000, borderOverride = {}) {
-    const ratio = layout.outputRatio || 1;
+    const b = Object.assign({}, layout.border, borderOverride);
+    const customRatio = Number(b.canvasRatio);
+    const ratio = Number.isFinite(customRatio) && customRatio > 0 ? customRatio : (layout.outputRatio || 1);
     let canvasW, canvasH;
     if (ratio >= 1) { canvasW = outputLongEdge; canvasH = Math.round(outputLongEdge / ratio); }
     else            { canvasH = outputLongEdge; canvasW = Math.round(outputLongEdge * ratio); }
 
-    const b       = Object.assign({}, layout.border, borderOverride);
+    const info = Object.assign({}, layout.infoBar, infoOverride);
+    const hasInfo = info.enabled !== false && Boolean((info.titleTemplate || '').trim() || (info.subtitleTemplate || '').trim());
     const shorter = Math.min(canvasW, canvasH);
-    const bTop    = Math.round(shorter * (b.top    || 0.04));
-    const bBottom = Math.round(shorter * (b.bottom || 0.20));
-    const bLeft   = Math.round(shorter * (b.left   || 0.04));
-    const bRight  = Math.round(shorter * (b.right  || 0.04));
+    const topRatio = b.top ?? 0.04;
+    const bottomRatio = !hasInfo && b.balanceEmptyInfo !== false ? topRatio : (b.bottom ?? 0.20);
+    const bTop    = Math.round(shorter * topRatio);
+    const bBottom = Math.round(shorter * bottomRatio);
+    const bLeft   = Math.round(shorter * (b.left  ?? 0.04));
+    const bRight  = Math.round(shorter * (b.right ?? 0.04));
+    const outer   = Math.max(0, Math.round(shorter * (b.outerMargin || 0)));
 
-    const paW = canvasW - bLeft - bRight;   // photo-area width
-    const paH = canvasH - bTop  - bBottom;  // photo-area height
+    const availableX = bLeft + outer;
+    const availableY = bTop + outer;
+    const availableW = Math.max(1, canvasW - bLeft - bRight - outer * 2);
+    const availableH = Math.max(1, canvasH - bTop - bBottom - outer * 2);
+    const layoutScale = Math.max(.2, Math.min(1, Number(b.layoutScale) || 1));
+    const paW = availableW * layoutScale;
+    const paH = availableH * layoutScale;
+    const alignX = b.layoutAlignX === 'left' ? 0 : b.layoutAlignX === 'right' ? 1 : .5;
+    const alignY = b.layoutAlignY === 'top' ? 0 : b.layoutAlignY === 'bottom' ? 1 : .5;
+    const paX = availableX + (availableW - paW) * alignX;
+    const paY = availableY + (availableH - paH) * alignY;
 
     const canvas = document.createElement('canvas');
     canvas.width  = canvasW;
@@ -390,8 +405,8 @@ window.CollageRenderer = (() => {
       const img = cellData.imgCache || await loadImage(cellData.file);
 
       const gap = Math.round(shorter * (b.cellGap || 0));
-      const cellX = Math.round(bLeft + cellDef.x * paW) + gap / 2;
-      const cellY = Math.round(bTop  + cellDef.y * paH) + gap / 2;
+      const cellX = Math.round(paX + cellDef.x * paW) + gap / 2;
+      const cellY = Math.round(paY + cellDef.y * paH) + gap / 2;
       const cellW = Math.max(1, Math.round(cellDef.w * paW) - gap);
       const cellH = Math.max(1, Math.round(cellDef.h * paH) - gap);
       const cellRadius = Math.max(0, shorter * (b.cellRadius || 0));
@@ -415,9 +430,8 @@ window.CollageRenderer = (() => {
     }
 
     // 信息文字
-    const info = Object.assign({}, layout.infoBar, infoOverride);
-    if (info.enabled !== false && (info.titleTemplate || info.subtitleTemplate)) {
-      await drawInfo(ctx, canvasW, canvasH, bTop, bBottom, paH, shorter, info);
+    if (hasInfo) {
+      await drawInfo(ctx, canvasW, canvasH, bTop, bBottom, canvasH - bTop - bBottom, shorter, info);
     }
 
     return canvas;

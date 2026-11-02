@@ -666,7 +666,10 @@
     const bL = shorter * (b.left   || 0.04);
     const bT = shorter * (b.top    || 0.04);
     const bR = shorter * (b.right  || 0.04);
-    const bB = shorter * (b.bottom || 0.18);
+    const hasInfo = preset.infoBar?.enabled !== false && Boolean(
+      (preset.infoBar?.titleTemplate || '').trim() || (preset.infoBar?.subtitleTemplate || '').trim()
+    );
+    const bB = shorter * (!hasInfo ? (b.top ?? 0.04) : (b.bottom ?? 0.18));
     const paX = fx + bL, paY = fy + bT;
     const paW = frameW - bL - bR, paH = frameH - bT - bB;
 
@@ -2464,6 +2467,50 @@
   // ══════════════════════════════════════════════════════════════════════════
   // 拼图模式
   // ══════════════════════════════════════════════════════════════════════════
+  function createDefaultCollageStyle(layout) {
+    return {
+      ...layout.border,
+      backgroundMode: layout.border?.backgroundMode || 'solid',
+      backgroundColor2: layout.border?.backgroundColor2 || '#DED7CA',
+      canvasRatio: 'auto', layoutScale: 1, layoutAlignX: 'center', layoutAlignY: 'center',
+      outerMargin: 0, balanceEmptyInfo: true,
+      cellGap: 0, cellRadius: 0, cellStroke: 0, cellStrokeColor: '#FFFFFF',
+      cellShadow: false, textureOpacity: .14,
+    };
+  }
+
+  function syncCollageStyleControls() {
+    const style = state.collageStyle;
+    setVal('collage-canvas-ratio', style.canvasRatio ?? 'auto');
+    setVal('collage-scale', style.layoutScale ?? 1);
+    setVal('collage-margin', style.outerMargin ?? 0);
+    setVal('collage-background-mode', style.backgroundMode);
+    setVal('collage-bg-color', style.color || '#FFFFFF');
+    setVal('collage-bg-color-2', style.backgroundColor2 || '#DED7CA');
+    setVal('collage-gap', style.cellGap || 0);
+    setVal('collage-radius', style.cellRadius || 0);
+    setVal('collage-stroke', style.cellStroke || 0);
+    setVal('collage-stroke-color', style.cellStrokeColor || '#FFFFFF');
+    const balance = document.getElementById('collage-balance-empty');
+    if (balance) balance.checked = style.balanceEmptyInfo !== false;
+    const shadow = document.getElementById('collage-shadow');
+    if (shadow) shadow.checked = Boolean(style.cellShadow);
+    const labels = {
+      'collage-scale-label': `${Math.round((style.layoutScale ?? 1) * 100)}%`,
+      'collage-margin-label': `${((style.outerMargin || 0) * 100).toFixed(1)}%`,
+      'collage-gap-label': `${((style.cellGap || 0) * 100).toFixed(1)}%`,
+      'collage-radius-label': `${((style.cellRadius || 0) * 100).toFixed(1)}%`,
+    };
+    Object.entries(labels).forEach(([id, value]) => {
+      const label = document.getElementById(id); if (label) label.textContent = value;
+    });
+    document.querySelectorAll('[data-collage-align]').forEach(button => {
+      const [x, y] = button.dataset.collageAlign.split(',');
+      button.classList.toggle('active', x === style.layoutAlignX && y === style.layoutAlignY);
+      button.setAttribute('aria-pressed', String(x === style.layoutAlignX && y === style.layoutAlignY));
+    });
+  }
+
   function setupCollageMode() {
     document.getElementById('btn-collage-cancel')
       ?.addEventListener('click', () => exitCollageMode());
@@ -2480,6 +2527,8 @@
     });
     const collageStyleControls = {
       'collage-gap': ['cellGap', Number], 'collage-radius': ['cellRadius', Number],
+      'collage-scale': ['layoutScale', Number], 'collage-margin': ['outerMargin', Number],
+      'collage-canvas-ratio': ['canvasRatio', String], 'collage-balance-empty': ['balanceEmptyInfo', Boolean],
       'collage-background-mode': ['backgroundMode', String], 'collage-bg-color': ['color', String],
       'collage-bg-color-2': ['backgroundColor2', String], 'collage-stroke': ['cellStroke', Number],
       'collage-stroke-color': ['cellStrokeColor', String], 'collage-shadow': ['cellShadow', Boolean],
@@ -2488,10 +2537,32 @@
       const control = document.getElementById(id);
       control?.addEventListener('input', () => {
         state.collageStyle[key] = Type === Boolean ? control.checked : Type(control.value);
-        const label = document.getElementById(id === 'collage-gap' ? 'collage-gap-label' : id === 'collage-radius' ? 'collage-radius-label' : '');
-        if (label) label.textContent = `${(Number(control.value) * 100).toFixed(1)}%`;
+        syncCollageStyleControls();
         scheduleCollagePreview();
       });
+    });
+    document.querySelectorAll('[data-collage-align]').forEach(button => {
+      button.addEventListener('click', () => {
+        const [x, y] = button.dataset.collageAlign.split(',');
+        state.collageStyle.layoutAlignX = x;
+        state.collageStyle.layoutAlignY = y;
+        syncCollageStyleControls();
+        scheduleCollagePreview();
+      });
+    });
+    document.getElementById('btn-collage-reset-style')?.addEventListener('click', () => {
+      if (!state.collageLayout) return;
+      state.collageStyle = createDefaultCollageStyle(state.collageLayout);
+      syncCollageStyleControls();
+      scheduleCollagePreview();
+    });
+    document.getElementById('btn-collage-shuffle')?.addEventListener('click', () => {
+      for (let i = state.collageCells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [state.collageCells[i], state.collageCells[j]] = [state.collageCells[j], state.collageCells[i]];
+      }
+      updateSlotList();
+      scheduleCollagePreview();
     });
 
     // 照片选择器取消
@@ -2511,7 +2582,7 @@
     state.collageLayout = JSON.parse(JSON.stringify(layout));
     state.collageCells  = Array.from({ length: layout.cellCount }, () => ({ file: null, cropRect: null }));
     state.collageActiveSlot = -1;
-    state.collageStyle = { ...layout.border, backgroundMode: layout.border?.backgroundMode || 'solid', backgroundColor2: layout.border?.backgroundColor2 || '#DED7CA', cellGap: 0, cellRadius: 0, cellStroke: 0, cellStrokeColor: '#FFFFFF', cellShadow: false, textureOpacity: .14 };
+    state.collageStyle = createDefaultCollageStyle(layout);
     state.collageMode = true;
 
     // 自动预填已上传的照片
@@ -2529,12 +2600,7 @@
 
     setVal('collage-title-input',    '');
     setVal('collage-subtitle-input', '');
-    setVal('collage-background-mode', state.collageStyle.backgroundMode);
-    setVal('collage-bg-color', state.collageStyle.color || '#FFFFFF');
-    setVal('collage-bg-color-2', state.collageStyle.backgroundColor2);
-    setVal('collage-gap', 0); setVal('collage-radius', 0); setVal('collage-stroke', 0);
-    setVal('collage-stroke-color', '#FFFFFF');
-    const collageShadow = document.getElementById('collage-shadow'); if (collageShadow) collageShadow.checked = false;
+    syncCollageStyleControls();
 
     updateSlotList();
     scheduleCollagePreview();

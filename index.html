@@ -700,29 +700,66 @@
         </div>
         <div class="collage-body">
           <div class="collage-slots-panel" id="collage-slots-panel">
-            <div class="collage-slots-title">照片分配</div>
+            <div class="collage-panel-heading"><span>照片分配</span><small>点击格子更换照片</small></div>
             <div id="collage-slot-list"></div>
-            <div class="collage-style-panel">
-              <div class="collage-slots-title">版式样式</div>
-              <label>格子间距 <output id="collage-gap-label">0%</output></label>
-              <input type="range" id="collage-gap" min="0" max="0.06" step="0.002" value="0">
-              <label>格子圆角 <output id="collage-radius-label">0%</output></label>
-              <input type="range" id="collage-radius" min="0" max="0.08" step="0.002" value="0">
-              <label>背景类型</label>
-              <select id="collage-background-mode"><option value="solid">纯色</option><option value="linear">渐变</option><option value="paper">艺术纸</option><option value="grain">颗粒</option></select>
-              <div class="form-row color-pair"><input type="color" id="collage-bg-color" value="#ffffff"><input type="color" id="collage-bg-color-2" value="#ded7ca"></div>
-              <label>格子描边</label>
-              <div class="range-row"><input type="range" id="collage-stroke" min="0" max="0.012" step="0.001" value="0"><input type="color" id="collage-stroke-color" value="#ffffff"></div>
-              <label class="toggle-row"><span>格子阴影</span><span class="toggle"><input type="checkbox" id="collage-shadow"><span class="toggle-slider"></span></span></label>
-            </div>
           </div>
           <div class="collage-preview-panel">
             <div id="collage-preview-wrapper">
               <canvas id="collage-canvas"></canvas>
             </div>
           </div>
+          <aside class="collage-inspector" aria-label="拼图样式设置">
+            <div class="collage-inspector-header">
+              <div><strong>版式设计</strong><small>画布、对齐与视觉样式</small></div>
+              <button id="btn-collage-reset-style" type="button">重置</button>
+            </div>
+
+            <section class="collage-control-card">
+              <h3>画布与版面</h3>
+              <label class="collage-field"><span>画布比例</span>
+                <select id="collage-canvas-ratio">
+                  <option value="auto">跟随模板</option><option value="1">1:1 方形</option>
+                  <option value="0.8">4:5 竖版</option><option value="0.75">3:4 竖版</option>
+                  <option value="0.5625">9:16 故事</option><option value="1.333333">4:3 横版</option>
+                  <option value="1.777778">16:9 横版</option>
+                </select>
+              </label>
+              <div class="collage-field">
+                <span>版面位置</span>
+                <div class="collage-align-grid" role="group" aria-label="版面位置">
+                  <button type="button" data-collage-align="left,top" title="左上"><i></i></button>
+                  <button type="button" data-collage-align="center,top" title="顶部居中"><i></i></button>
+                  <button type="button" data-collage-align="right,top" title="右上"><i></i></button>
+                  <button type="button" data-collage-align="left,center" title="左侧居中"><i></i></button>
+                  <button type="button" data-collage-align="center,center" title="水平垂直居中"><i></i></button>
+                  <button type="button" data-collage-align="right,center" title="右侧居中"><i></i></button>
+                  <button type="button" data-collage-align="left,bottom" title="左下"><i></i></button>
+                  <button type="button" data-collage-align="center,bottom" title="底部居中"><i></i></button>
+                  <button type="button" data-collage-align="right,bottom" title="右下"><i></i></button>
+                </div>
+              </div>
+              <label class="collage-range-field"><span>版面缩放 <output id="collage-scale-label">100%</output></span><input type="range" id="collage-scale" min="0.55" max="1" step="0.01" value="1"></label>
+              <label class="collage-range-field"><span>画布留白 <output id="collage-margin-label">0%</output></span><input type="range" id="collage-margin" min="0" max="0.16" step="0.005" value="0"></label>
+              <label class="collage-switch-row"><span><b>自动均衡留白</b><small>没有标题时保持上下对称</small></span><span class="toggle"><input type="checkbox" id="collage-balance-empty" checked><span class="toggle-slider"></span></span></label>
+            </section>
+
+            <section class="collage-control-card">
+              <h3>格子样式</h3>
+              <label class="collage-range-field"><span>格子间距 <output id="collage-gap-label">0%</output></span><input type="range" id="collage-gap" min="0" max="0.06" step="0.002" value="0"></label>
+              <label class="collage-range-field"><span>格子圆角 <output id="collage-radius-label">0%</output></span><input type="range" id="collage-radius" min="0" max="0.08" step="0.002" value="0"></label>
+              <label class="collage-field"><span>背景材质</span><select id="collage-background-mode"><option value="solid">纯色</option><option value="linear">渐变</option><option value="paper">艺术纸</option><option value="grain">颗粒</option></select></label>
+              <div class="collage-color-row"><label><span>主色</span><input type="color" id="collage-bg-color" value="#ffffff"></label><label><span>辅色</span><input type="color" id="collage-bg-color-2" value="#ded7ca"></label></div>
+              <label class="collage-range-field"><span>格子描边</span><span class="collage-stroke-control"><input type="range" id="collage-stroke" min="0" max="0.012" step="0.001" value="0"><input type="color" id="collage-stroke-color" value="#ffffff" title="描边颜色"></span></label>
+              <label class="collage-switch-row"><span><b>柔和阴影</b><small>增强照片层次感</small></span><span class="toggle"><input type="checkbox" id="collage-shadow"><span class="toggle-slider"></span></span></label>
+            </section>
+
+            <section class="collage-control-card collage-quick-actions">
+              <h3>快速操作</h3>
+              <button id="btn-collage-shuffle" type="button">随机调整照片顺序</button>
+            </section>
+          </aside>
         </div>
-        <div class="collage-hint">点击格子分配照片  ·  可为每格单独调整裁切</div>
+        <div class="collage-hint">点击格子分配照片 · 可为每格单独调整裁切 · 手机端左右滑动切换面板</div>
       </div>
 
     </main>

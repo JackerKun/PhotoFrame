@@ -280,6 +280,31 @@ test('collage professional styling renders', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: '拼图', exact: true }).click();
   await page.locator('.preset-card').first().click();
   await expect(page.locator('#collage-overlay')).toBeVisible();
+  await expect(page.locator('.collage-inspector')).toBeVisible();
+  await expect(page.locator('#btn-collage-shuffle')).toBeVisible();
+  await page.waitForTimeout(400);
+
+  const balancedMargins = await page.locator('#collage-canvas').evaluate(canvas => {
+    const { width, height } = canvas;
+    const data = canvas.getContext('2d').getImageData(0, 0, width, height).data;
+    const bg = [data[0], data[1], data[2]];
+    let top = height, bottom = -1;
+    for (let y = 0; y < height; y += 2) {
+      for (let x = 0; x < width; x += 2) {
+        const i = (y * width + x) * 4;
+        const difference = Math.abs(data[i] - bg[0]) + Math.abs(data[i + 1] - bg[1]) + Math.abs(data[i + 2] - bg[2]);
+        if (difference > 45) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
+      }
+    }
+    return { top, bottom: height - 1 - bottom };
+  });
+  expect(Math.abs(balancedMargins.top - balancedMargins.bottom)).toBeLessThanOrEqual(6);
+
+  await page.locator('#collage-canvas-ratio').selectOption('1');
+  await page.locator('#collage-scale').fill('0.72');
+  await page.locator('#collage-margin').fill('0.05');
+  await page.locator('[data-collage-align="center,bottom"]').click();
+  await expect(page.locator('[data-collage-align="center,bottom"]')).toHaveClass(/active/);
   await page.locator('#collage-gap').fill('0.03');
   await page.locator('#collage-radius').fill('0.024');
   await page.locator('#collage-background-mode').selectOption('paper');
@@ -288,5 +313,33 @@ test('collage professional styling renders', async ({ page }, testInfo) => {
   await expect(page.locator('#collage-canvas')).toBeVisible();
   const size = await page.locator('#collage-canvas').evaluate(c => [c.width, c.height]);
   expect(size[0]).toBeGreaterThan(100);
-  expect(size[1]).toBeGreaterThan(100);
+  expect(size[1]).toBe(size[0]);
+  await page.screenshot({ path: '/tmp/photoframe-collage-workbench.png', fullPage: true });
+});
+
+test('mobile collage workbench uses swipeable full-width panels', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'mobile-one.svg', mimeType: 'image/svg+xml', buffer: svg },
+    { name: 'mobile-two.svg', mimeType: 'image/svg+xml', buffer: svg },
+  ]);
+  await page.evaluate(() => {
+    document.querySelector('#panel-left').classList.add('mobile-open');
+    document.querySelector('.panel-tab[data-tab="presets"]').click();
+  });
+  await page.getByRole('button', { name: '拼图', exact: true }).click();
+  await page.locator('.preset-card').first().evaluate(card => card.click());
+  await page.evaluate(() => {
+    document.querySelector('#panel-left').classList.remove('mobile-open');
+    document.querySelector('#mobile-panel-backdrop').hidden = true;
+  });
+  await expect(page.locator('#collage-overlay')).toBeVisible();
+  const panelMetrics = await page.locator('.collage-body').evaluate(body => {
+    const preview = body.querySelector('.collage-preview-panel').getBoundingClientRect();
+    return { clientWidth: body.clientWidth, scrollWidth: body.scrollWidth, previewWidth: preview.width };
+  });
+  expect(panelMetrics.scrollWidth).toBeGreaterThan(panelMetrics.clientWidth * 2);
+  expect(panelMetrics.previewWidth).toBeGreaterThanOrEqual(panelMetrics.clientWidth - 2);
+  await page.locator('.collage-body').evaluate(body => { body.scrollLeft = body.scrollWidth; });
+  await expect(page.locator('.collage-inspector')).toBeInViewport();
 });
