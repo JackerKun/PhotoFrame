@@ -27,6 +27,30 @@ test('upload, preset search, edit history and export state', async ({ page }, te
   await page.screenshot({ path: `/tmp/photoframe-${testInfo.project.name}.png`, fullPage: true });
 });
 
+test('built-in and personal stickers render and remain editable', async ({ page }, testInfo) => {
+  await page.locator('#file-input').setInputFiles({ name: 'sticker-photo.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await expect(page.locator('#canvas-preview')).toBeVisible();
+  const before = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
+
+  await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
+  if (testInfo.project.name === 'mobile') await page.locator('#panel-left').evaluate(el => el.classList.add('mobile-open'));
+  await expect(page.locator('.sticker-category-btn')).toHaveCount(8);
+  await expect(page.locator('.sticker-card')).toHaveCount(28);
+  await page.locator('.sticker-card[data-sticker-id="film-portra400"]').evaluate(el => el.click());
+  await expect(page.locator('#sticker-inspector')).toBeVisible();
+  await expect(page.locator('#sticker-transform-handle')).toBeVisible();
+  await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(before);
+
+  await page.locator('#sticker-rotation').fill('24');
+  await expect(page.locator('#sticker-rotation-label')).toHaveText('24°');
+  const personal = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" rx="24" fill="#6236ff"/><text x="100" y="62" fill="white" text-anchor="middle" font-size="30">MY FILM</text></svg>');
+  await page.locator('#sticker-upload').setInputFiles({ name: 'my-film.svg', mimeType: 'image/svg+xml', buffer: personal });
+  await expect(page.locator('.sticker-card[data-sticker-id^="custom-"]')).toHaveCount(1);
+  await page.reload();
+  await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
+  await expect(page.locator('.sticker-card[data-sticker-id^="custom-"]')).toHaveCount(1);
+});
+
 test('mobile controls open as a bottom sheet', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile');
   await page.locator('.mobile-nav-tab[data-panel="border"]').click();

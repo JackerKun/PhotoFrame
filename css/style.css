@@ -1701,5 +1701,50 @@ input[type="checkbox"] { accent-color: var(--accent); }
   .theme-picker span { display:none; }
 }
 
+/* ── 贴图库 ─────────────────────────────────────────────────────────────── */
+.sticker-library-head { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px; }
+.sticker-library-head > div { display:flex;flex-direction:column;gap:2px; }
+.sticker-library-head strong { font-size:15px;color:var(--text-1); }
+.sticker-library-head small,.sticker-privacy { font-size:10px;color:var(--text-3);line-height:1.5; }
+.sticker-upload-btn { cursor:pointer;display:inline-flex;align-items:center;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--bg-hover);color:var(--text-1);font-size:12px;font-weight:650; }
+.sticker-upload-btn:hover { border-color:var(--accent);color:var(--accent); }
+.sticker-search { width:100%;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input);color:var(--text-1);padding:0 11px;margin-bottom:10px;outline:none; }
+.sticker-search:focus { border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,transparent); }
+.sticker-categories { display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none; }
+.sticker-categories::-webkit-scrollbar { display:none; }
+.sticker-category-btn { flex:none;border:1px solid var(--border);background:transparent;color:var(--text-2);border-radius:999px;padding:5px 9px;font-size:11px;cursor:pointer; }
+.sticker-category-btn.active { color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);border-color:color-mix(in srgb,var(--accent) 55%,var(--border)); }
+.sticker-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;max-height:340px;overflow-y:auto;padding:2px; }
+.sticker-card { position:relative;min-width:0;aspect-ratio:1;border:1px solid var(--border);border-radius:11px;background:var(--bg-hover);padding:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--text-2);cursor:pointer;overflow:hidden; }
+.sticker-card:hover { border-color:var(--accent);transform:translateY(-1px);box-shadow:0 5px 14px rgba(0,0,0,.12); }
+.sticker-card img { width:100%;height:66%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.14)); }
+.sticker-card > span { width:100%;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center; }
+.sticker-card-remove { position:absolute;right:4px;top:4px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:rgba(20,20,20,.72);color:#fff;font-style:normal;font-size:14px;opacity:0; }
+.sticker-card:hover .sticker-card-remove,.sticker-card:focus .sticker-card-remove { opacity:1; }
+.sticker-empty { padding:30px 0;text-align:center;color:var(--text-3);font-size:12px; }
+.sticker-inspector { margin-top:12px;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--bg-hover);display:grid;gap:10px; }
+.sticker-inspector-title { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.sticker-inspector-title strong { font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.sticker-inspector-title button { border:0;background:transparent;color:#dc665f;cursor:pointer;font-size:11px; }
+.sticker-inspector label { display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px;font-size:11px;color:var(--text-2); }
+.sticker-inspector label input { grid-column:1 / -1;width:100%; }
+.sticker-inspector output { color:var(--text-1);font-variant-numeric:tabular-nums; }
+.sticker-action-row { display:grid;grid-template-columns:repeat(3,1fr);gap:5px; }
+.sticker-action-row button { border:1px solid var(--border);border-radius:7px;background:var(--bg-input);color:var(--text-2);padding:6px 3px;font-size:10px;cursor:pointer; }
+.sticker-action-row button:hover { color:var(--accent);border-color:var(--accent); }
+.sticker-privacy { margin:10px 2px 0; }
+
+.sticker-transform-handle { position:fixed;z-index:325;box-sizing:border-box;border:1.5px dashed #3b91ff;cursor:move;touch-action:none;user-select:none;transform-origin:center; }
+.sticker-handle-label { position:absolute;left:-1px;bottom:calc(100% + 5px);max-width:130px;padding:3px 7px;border-radius:5px;background:#2878dc;color:white;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.sticker-handle-delete { position:absolute;right:-12px;top:-12px;width:23px;height:23px;border:2px solid white;border-radius:50%;background:#e4514b;color:white;display:grid;place-items:center;padding:0;line-height:1;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25); }
+.sticker-transform-corner { position:absolute;right:-7px;bottom:-7px;width:13px;height:13px;border:2px solid white;background:#2878dc;border-radius:2px;cursor:nwse-resize;box-shadow:0 1px 4px rgba(0,0,0,.25); }
+.sticker-transform-rotate { position:absolute;left:50%;top:-31px;transform:translateX(-50%);width:21px;height:21px;border:2px solid white;border-radius:50%;display:grid;place-items:center;background:#2878dc;color:white;font-size:12px;cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.25); }
+.sticker-transform-rotate::after { content:'';position:absolute;left:50%;top:19px;height:9px;border-left:1px dashed #2878dc; }
+
+@media (max-width:768px) {
+  .sticker-grid { grid-template-columns:repeat(3,minmax(0,1fr));max-height:none; }
+  .sticker-card-remove { opacity:1; }
+}
+
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

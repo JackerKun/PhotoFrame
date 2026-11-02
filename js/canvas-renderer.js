@@ -13,6 +13,7 @@ window.CanvasRenderer = (() => {
 
   // ── 加载图片 ──────────────────────────────────────────────────────────────
   const imageCache = new Map();
+  const stickerImageCache = new Map();
   const MAX_DECODED_IMAGES = 3;
   function loadImage(file) {
     if (imageCache.has(file)) {
@@ -29,6 +30,39 @@ window.CanvasRenderer = (() => {
     }
     pending.catch(() => imageCache.delete(file));
     return pending;
+  }
+
+  function loadStickerImage(src) {
+    if (stickerImageCache.has(src)) return stickerImageCache.get(src);
+    const pending = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('贴图加载失败'));
+      img.src = src;
+    });
+    stickerImageCache.set(src, pending);
+    pending.catch(() => stickerImageCache.delete(src));
+    return pending;
+  }
+
+  async function drawStickers(ctx, canvasW, canvasH, shorter, job) {
+    for (const sticker of job?.stickers || []) {
+      if (!sticker?.src) continue;
+      try {
+        const img = await loadStickerImage(sticker.src);
+        const ratio = Math.max(.05, sticker.ratio || img.naturalWidth / img.naturalHeight || 1);
+        const width = Math.max(1, shorter * Math.max(.01, sticker.scale ?? .18));
+        const height = width / ratio;
+        ctx.save();
+        ctx.translate((sticker.x ?? .5) * canvasW, (sticker.y ?? .5) * canvasH);
+        ctx.rotate((sticker.rotation || 0) * Math.PI / 180);
+        ctx.globalAlpha = Math.max(.05, Math.min(1, sticker.opacity ?? 1));
+        ctx.drawImage(img, -width / 2, -height / 2, width, height);
+        ctx.restore();
+      } catch (e) {
+        console.warn('[Sticker] render failed', e);
+      }
+    }
   }
 
   // ── 合并预设与 job 覆盖 ───────────────────────────────────────────────────
@@ -485,6 +519,8 @@ window.CanvasRenderer = (() => {
       await drawInfoBar(ctx, layout, info, job);
       _lastLayout.textBounds = layout.textBounds || null;
     }
+
+    await drawStickers(ctx, canvasW, canvasH, shorter, job);
 
     return canvas;
   }

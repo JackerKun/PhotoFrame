@@ -38,6 +38,10 @@
     frameGridEnabled: true,    // 边框编辑三分网格
     frameSnapEnabled: true,    // 边缘/中心/三分线吸附
     presetQuery: '',
+    stickerCategory: 'all',
+    stickerQuery: '',
+    customStickers: [],
+    selectedStickerId: null,
     exportFilenameTemplate: '{name}_frame_{index}',
     persistOriginals: true,
     undoStack: [],
@@ -46,6 +50,7 @@
 
   let _textDragState = null; // { startX, startY, startOffsetX, startOffsetY }
   let _borderDragState = null; // { corner, type, startX, startY, startBTop, ... }
+  let _stickerDragState = null;
 
   let previewDebounce = null;
   let _rafPreview = null;  // 拖拽用 RAF 节流
@@ -128,6 +133,7 @@
     renderPresetGrid();
     setupUpload();
     setupTabs();
+    setupStickerLibrary();
     setupInfoForm();
     setupBorderForm();
     setupExportControls();
@@ -189,6 +195,7 @@
         overrides: { location: '', camera: '', film: '', date: '' },
         borderOverrides: {},
         infoOverrides: {},
+        stickers: [],
         thumbUrl: null,
         status: 'idle',
       };
@@ -344,6 +351,7 @@
 
   function selectJob(id) {
     state.activeJobId = id;
+    state.selectedStickerId = null;
     state.selectionAnchorId = id;
     const job = activeJob();
 
@@ -367,6 +375,7 @@
       fillBorderForm(activePreset(), job);
     }
     updateCropButton();
+    syncStickerInspector();
     schedulePreview();
   }
 
@@ -868,6 +877,7 @@
         document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
         const el = document.getElementById(`tab-${tab}`);
         if (el) el.hidden = false;
+        updateStickerTransformHandle();
       });
     });
   }
@@ -1643,6 +1653,7 @@
       displayPreview(canvas);
       updateSizeInfo(canvas);
       updateTextPosHandle();   // 文字位置句柄跟随重渲染更新
+      updateStickerTransformHandle();
       // 等浏览器 layout 完成后再定位边框句柄，确保 getBoundingClientRect 是最新值
       // 拖拽中：用预测算法（锁定 rect）；静止时：用实际 layout
       requestAnimationFrame(_borderDragState ? updateBorderResizeHandlesDrag : updateBorderResizeHandles);
@@ -1709,6 +1720,7 @@
 
     // 画布渲染后应用缩放
     applyZoom(wrapper, preview);
+    requestAnimationFrame(updateStickerTransformHandle);
   }
 
   function clearPreview() {
@@ -2022,7 +2034,7 @@
         btn.classList.add('active');
 
         // 映射到左侧 tab
-        const map = { presets: 'presets', info: 'info', border: 'border', export: 'output' };
+        const map = { presets: 'presets', info: 'info', border: 'border', stickers: 'stickers', export: 'output' };
         const tabName = map[panel] || 'presets';
         const tabBtn = document.querySelector(`.panel-tab[data-tab="${tabName}"]`);
         if (tabBtn) tabBtn.click();
@@ -2072,6 +2084,7 @@
         infoOverrides: structuredClone(j.infoOverrides || {}),
         cropRect: structuredClone(j.cropRect || null),
         frameLayout: structuredClone(j.frameLayout || null),
+        stickers: structuredClone(j.stickers || []),
       })),
     };
   }
@@ -2096,6 +2109,8 @@
     updateFilmstrip();
     const job = activeJob();
     if (job) { fillInfoForm(job); fillBorderForm(activePreset(), job); }
+    state.selectedStickerId = null;
+    syncStickerInspector();
     syncExportControlsFromPreset(activePreset());
     schedulePreview();
   }
@@ -2186,7 +2201,8 @@
     const syncTextStyle = document.getElementById('sync-text-style').checked;
     const syncTextContent = document.getElementById('sync-text-content').checked;
     const syncCrop = document.getElementById('sync-crop').checked;
-    if (![syncFrame, syncTextStyle, syncTextContent, syncCrop].some(Boolean)) return showToast('请至少选择一项同步内容', 'warn');
+    const syncStickers = document.getElementById('sync-stickers').checked;
+    if (![syncFrame, syncTextStyle, syncTextContent, syncCrop, syncStickers].some(Boolean)) return showToast('请至少选择一项同步内容', 'warn');
 
     const button = document.getElementById('btn-sync-confirm');
     const label = button?.querySelector('span');
@@ -2219,6 +2235,7 @@
           }
         }
         if (syncCrop) target.cropRect = await normalizedCropForTarget(source, target);
+        if (syncStickers) target.stickers = structuredClone(source.stickers || []);
       }
       updateFilmstrip();
       scheduleSessionSave();
@@ -3815,6 +3832,215 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // 贴图库
+  // ══════════════════════════════════════════════════════════════════════════
+  function allStickerAssets() {
+    return [...(window.StickerLibrary?.builtIns || []), ...state.customStickers];
+  }
+
+  function selectedSticker() {
+    return activeJob()?.stickers?.find(item => item.id === state.selectedStickerId) || null;
+  }
+
+  async function setupStickerLibrary() {
+    renderStickerCategories();
+    renderStickerGrid();
+    try {
+      state.customStickers = await SessionStore.listStickers();
+      renderStickerGrid();
+    } catch (e) { console.warn('个人贴图库读取失败', e); }
+
+    document.getElementById('sticker-search')?.addEventListener('input', e => {
+      state.stickerQuery = e.target.value.trim().toLowerCase();
+      renderStickerGrid();
+    });
+    document.getElementById('sticker-upload')?.addEventListener('change', async e => {
+      const files = [...e.target.files]; e.target.value = '';
+      for (const file of files) await importCustomSticker(file);
+    });
+
+    const bindRange = (id, key, format) => document.getElementById(id)?.addEventListener('input', e => {
+      const sticker = selectedSticker();
+      if (!sticker) return;
+      sticker[key] = Number(e.target.value);
+      document.getElementById(`${id}-label`).textContent = format(sticker[key]);
+      schedulePreviewNow(); updateStickerTransformHandle();
+    });
+    bindRange('sticker-scale', 'scale', v => `${Math.round(v * 100)}%`);
+    bindRange('sticker-rotation', 'rotation', v => `${Math.round(v)}°`);
+    bindRange('sticker-opacity', 'opacity', v => `${Math.round(v * 100)}%`);
+    document.getElementById('btn-sticker-delete')?.addEventListener('click', deleteSelectedSticker);
+    document.getElementById('sticker-handle-delete')?.addEventListener('click', e => { e.stopPropagation(); deleteSelectedSticker(); });
+    document.getElementById('btn-sticker-duplicate')?.addEventListener('click', duplicateSelectedSticker);
+    document.getElementById('btn-sticker-front')?.addEventListener('click', () => moveStickerLayer(true));
+    document.getElementById('btn-sticker-back')?.addEventListener('click', () => moveStickerLayer(false));
+    setupStickerTransform();
+    document.getElementById('canvas-preview')?.addEventListener('pointerdown', selectStickerAtPointer);
+    document.addEventListener('keydown', e => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.activeTab === 'stickers' && state.selectedStickerId && !/input|textarea|select/i.test(document.activeElement?.tagName || '')) {
+        e.preventDefault(); deleteSelectedSticker();
+      }
+    });
+    window.addEventListener('resize', updateStickerTransformHandle);
+    document.querySelector('.preview-area')?.addEventListener('scroll', updateStickerTransformHandle, { passive: true });
+  }
+
+  function renderStickerCategories() {
+    const root = document.getElementById('sticker-categories');
+    if (!root) return;
+    root.innerHTML = '';
+    (window.StickerLibrary?.categories || []).forEach(category => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'sticker-category-btn';
+      button.classList.toggle('active', state.stickerCategory === category.id);
+      button.textContent = category.name;
+      button.addEventListener('click', () => { state.stickerCategory = category.id; renderStickerCategories(); renderStickerGrid(); });
+      root.appendChild(button);
+    });
+  }
+
+  function renderStickerGrid() {
+    const grid = document.getElementById('sticker-grid');
+    const empty = document.getElementById('sticker-empty');
+    if (!grid) return;
+    const query = state.stickerQuery;
+    const assets = allStickerAssets().filter(asset =>
+      (state.stickerCategory === 'all' || asset.category === state.stickerCategory) &&
+      (!query || `${asset.name} ${asset.tags || ''}`.toLowerCase().includes(query))
+    );
+    grid.innerHTML = '';
+    assets.forEach(asset => {
+      const card = document.createElement('button');
+      card.type = 'button'; card.className = 'sticker-card'; card.dataset.stickerId = asset.id;
+      const img = document.createElement('img'); img.src = asset.src; img.alt = '';
+      const name = document.createElement('span'); name.textContent = asset.name;
+      card.append(img, name);
+      if (asset.custom) {
+        const remove = document.createElement('i'); remove.className = 'sticker-card-remove'; remove.textContent = '×'; remove.title = '从个人贴图库删除';
+        remove.addEventListener('click', async e => {
+          e.stopPropagation();
+          await SessionStore.deleteSticker(asset.id);
+          state.customStickers = state.customStickers.filter(item => item.id !== asset.id);
+          renderStickerGrid(); showToast('已从个人贴图库移除');
+        });
+        card.appendChild(remove);
+      }
+      card.addEventListener('click', () => addSticker(asset));
+      grid.appendChild(card);
+    });
+    if (empty) empty.hidden = !!assets.length;
+  }
+
+  async function importCustomSticker(file) {
+    if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
+      showToast(`${file.name} 不是支持的贴图或超过 5MB`, 'warn'); return;
+    }
+    const src = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+    const ratio = await new Promise(resolve => { const image = new Image(); image.onload = () => resolve(image.naturalWidth / image.naturalHeight || 1); image.onerror = () => resolve(1); image.src = src; });
+    const asset = { id: `custom-${uid()}`, name: file.name.replace(/\.[^.]+$/, ''), category: 'custom', tags: '个人 自定义', src, ratio, custom: true, createdAt: Date.now() };
+    await SessionStore.saveSticker(asset);
+    state.customStickers.unshift(asset); state.stickerCategory = 'custom';
+    renderStickerCategories(); renderStickerGrid(); showToast(`已加入个人贴图库：${asset.name}`);
+  }
+
+  function addSticker(asset) {
+    const job = activeJob();
+    if (!job) return showToast('请先上传照片', 'warn');
+    const before = historySnapshot();
+    job.stickers ||= [];
+    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, x: .5, y: .5, scale: asset.category === 'film' ? .22 : .18, rotation: 0, opacity: 1 };
+    job.stickers.push(sticker); state.selectedStickerId = sticker.id;
+    pushHistorySnapshot(before, '添加贴图'); syncStickerInspector(); schedulePreview();
+  }
+
+  function selectStickerAtPointer(e) {
+    if (state.activeTab !== 'stickers') return;
+    const job = activeJob(); const canvas = e.currentTarget; const rect = canvas.getBoundingClientRect();
+    if (!job?.stickers?.length || !rect.width) return;
+    const px = (e.clientX - rect.left) / rect.width * canvas.width;
+    const py = (e.clientY - rect.top) / rect.height * canvas.height;
+    const shorter = Math.min(canvas.width, canvas.height);
+    const hit = [...job.stickers].reverse().find(sticker => {
+      const cx = (sticker.x ?? .5) * canvas.width; const cy = (sticker.y ?? .5) * canvas.height;
+      const angle = -(sticker.rotation || 0) * Math.PI / 180; const dx = px - cx; const dy = py - cy;
+      const localX = dx * Math.cos(angle) - dy * Math.sin(angle); const localY = dx * Math.sin(angle) + dy * Math.cos(angle);
+      const width = shorter * sticker.scale; const height = width / Math.max(.05, sticker.ratio || 1);
+      return Math.abs(localX) <= width / 2 && Math.abs(localY) <= height / 2;
+    });
+    if (hit) { state.selectedStickerId = hit.id; syncStickerInspector(); e.preventDefault(); e.stopPropagation(); }
+  }
+
+  function deleteSelectedSticker() {
+    const job = activeJob(); const sticker = selectedSticker();
+    if (!job || !sticker) return;
+    const before = historySnapshot();
+    job.stickers = job.stickers.filter(item => item.id !== sticker.id); state.selectedStickerId = null;
+    pushHistorySnapshot(before, '删除贴图'); syncStickerInspector(); schedulePreview();
+  }
+
+  function duplicateSelectedSticker() {
+    const job = activeJob(); const sticker = selectedSticker();
+    if (!job || !sticker) return;
+    const before = historySnapshot();
+    const copy = { ...structuredClone(sticker), id: uid(), x: Math.min(.95, sticker.x + .035), y: Math.min(.95, sticker.y + .035) };
+    job.stickers.push(copy); state.selectedStickerId = copy.id;
+    pushHistorySnapshot(before, '复制贴图'); syncStickerInspector(); schedulePreview();
+  }
+
+  function moveStickerLayer(front) {
+    const job = activeJob(); const sticker = selectedSticker();
+    if (!job || !sticker) return;
+    const before = historySnapshot(); const index = job.stickers.indexOf(sticker);
+    job.stickers.splice(index, 1); front ? job.stickers.push(sticker) : job.stickers.unshift(sticker);
+    pushHistorySnapshot(before, front ? '贴图置顶' : '贴图置底'); schedulePreview();
+  }
+
+  function syncStickerInspector() {
+    const sticker = selectedSticker(); const inspector = document.getElementById('sticker-inspector');
+    if (inspector) inspector.hidden = !sticker;
+    if (!sticker) { updateStickerTransformHandle(); return; }
+    document.getElementById('sticker-selected-name').textContent = sticker.name;
+    [['scale', sticker.scale, `${Math.round(sticker.scale * 100)}%`], ['rotation', sticker.rotation, `${Math.round(sticker.rotation)}°`], ['opacity', sticker.opacity, `${Math.round(sticker.opacity * 100)}%`]].forEach(([key, value, label]) => {
+      document.getElementById(`sticker-${key}`).value = value; document.getElementById(`sticker-${key}-label`).textContent = label;
+    });
+    updateStickerTransformHandle();
+  }
+
+  function updateStickerTransformHandle() {
+    const handle = document.getElementById('sticker-transform-handle'); const sticker = selectedSticker(); const canvas = document.getElementById('canvas-preview');
+    if (!handle) return;
+    if (!sticker || state.activeTab !== 'stickers' || !canvas || !canvas.width) { handle.hidden = true; return; }
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) { handle.hidden = true; return; }
+    const shorter = Math.min(canvas.width, canvas.height); const width = shorter * sticker.scale * rect.width / canvas.width; const height = width / Math.max(.05, sticker.ratio || 1);
+    const cx = rect.left + sticker.x * rect.width; const cy = rect.top + sticker.y * rect.height;
+    handle.hidden = false; handle.style.left = `${cx - width / 2}px`; handle.style.top = `${cy - height / 2}px`;
+    handle.style.width = `${Math.max(24, width)}px`; handle.style.height = `${Math.max(18, height)}px`; handle.style.transform = `rotate(${sticker.rotation || 0}deg)`;
+    handle.dataset.cx = cx; handle.dataset.cy = cy; document.getElementById('sticker-handle-label').textContent = sticker.name;
+  }
+
+  function setupStickerTransform() {
+    const handle = document.getElementById('sticker-transform-handle'); if (!handle) return;
+    handle.addEventListener('pointerdown', e => {
+      if (e.target.closest('button')) return;
+      const sticker = selectedSticker(); const canvas = document.getElementById('canvas-preview'); if (!sticker || !canvas) return;
+      e.preventDefault(); e.stopPropagation(); handle.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect(); const cx = Number(handle.dataset.cx); const cy = Number(handle.dataset.cy);
+      const mode = e.target.classList.contains('sticker-transform-corner') ? 'scale' : e.target.classList.contains('sticker-transform-rotate') ? 'rotate' : 'move';
+      _stickerDragState = { mode, sticker, rect, startX: e.clientX, startY: e.clientY, x: sticker.x, y: sticker.y, scale: sticker.scale, rotation: sticker.rotation || 0, distance: Math.hypot(e.clientX - cx, e.clientY - cy) || 1, angle: Math.atan2(e.clientY - cy, e.clientX - cx), cx, cy, before: historySnapshot() };
+    });
+    handle.addEventListener('pointermove', e => {
+      const d = _stickerDragState; if (!d) return;
+      if (d.mode === 'move') { d.sticker.x = Math.max(0, Math.min(1, d.x + (e.clientX - d.startX) / d.rect.width)); d.sticker.y = Math.max(0, Math.min(1, d.y + (e.clientY - d.startY) / d.rect.height)); }
+      else if (d.mode === 'scale') d.sticker.scale = Math.max(.04, Math.min(.7, d.scale * Math.hypot(e.clientX - d.cx, e.clientY - d.cy) / d.distance));
+      else d.sticker.rotation = Math.round(d.rotation + (Math.atan2(e.clientY - d.cy, e.clientX - d.cx) - d.angle) * 180 / Math.PI);
+      syncStickerInspector(); schedulePreviewNow();
+    });
+    const finish = () => { if (!_stickerDragState) return; pushHistorySnapshot(_stickerDragState.before, '变换贴图'); _stickerDragState = null; scheduleSessionSave(); };
+    handle.addEventListener('pointerup', finish); handle.addEventListener('pointercancel', finish);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // 会话持久化
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -3862,6 +4088,7 @@
 
       // 重建缩略图（thumbUrl 已存入 DB，但如果缺失则重新生成）
       for (const job of state.jobs) {
+        if (!Array.isArray(job.stickers)) job.stickers = [];
         if (!job.thumbUrl) createThumb(job);
       }
 

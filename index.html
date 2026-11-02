@@ -92,6 +92,7 @@
         <button class="panel-tab active" data-tab="presets" role="tab" aria-selected="true" aria-controls="tab-presets">预设</button>
         <button class="panel-tab" data-tab="info" role="tab" aria-selected="false" aria-controls="tab-info">信息</button>
         <button class="panel-tab" data-tab="border" role="tab" aria-selected="false" aria-controls="tab-border">边框&字体</button>
+        <button class="panel-tab" data-tab="stickers" role="tab" aria-selected="false" aria-controls="tab-stickers">贴图</button>
         <button class="panel-tab" data-tab="output" role="tab" aria-selected="false" aria-controls="tab-output">导出</button>
       </div>
 
@@ -463,6 +464,23 @@
 
       </div>
 
+      <!-- ── Tab: 贴图库 ──────────────────────────────────────────────── -->
+      <div class="tab-content" id="tab-stickers" hidden>
+        <div class="sticker-library-head"><div><strong>贴图库</strong><small>点击添加到当前照片</small></div><label class="sticker-upload-btn" title="导入 PNG、JPG、WebP 或 SVG"><input id="sticker-upload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden><span>＋ 导入</span></label></div>
+        <input id="sticker-search" class="sticker-search" type="search" placeholder="搜索胶片、胶带、印章…" aria-label="搜索贴图">
+        <div id="sticker-categories" class="sticker-categories"></div>
+        <div id="sticker-grid" class="sticker-grid"></div>
+        <div id="sticker-empty" class="sticker-empty" hidden>该分类还没有贴图</div>
+        <div id="sticker-inspector" class="sticker-inspector" hidden>
+          <div class="sticker-inspector-title"><strong id="sticker-selected-name">当前贴图</strong><button id="btn-sticker-delete" type="button">删除</button></div>
+          <label>大小 <output id="sticker-scale-label">18%</output><input id="sticker-scale" type="range" min="0.04" max="0.70" step="0.01" value="0.18"></label>
+          <label>旋转 <output id="sticker-rotation-label">0°</output><input id="sticker-rotation" type="range" min="-180" max="180" step="1" value="0"></label>
+          <label>透明度 <output id="sticker-opacity-label">100%</output><input id="sticker-opacity" type="range" min="0.1" max="1" step="0.01" value="1"></label>
+          <div class="sticker-action-row"><button id="btn-sticker-back" type="button">下移一层</button><button id="btn-sticker-front" type="button">置于顶层</button><button id="btn-sticker-duplicate" type="button">复制</button></div>
+        </div>
+        <p class="sticker-privacy">个人贴图只保存在当前浏览器中，不会上传服务器。</p>
+      </div>
+
       <!-- ── Tab: 导出设置 ─────────────────────────────────────────────── -->
       <div class="tab-content" id="tab-output" hidden>
         <div id="output-summary" class="output-summary" aria-live="polite">
@@ -558,6 +576,13 @@
         <span class="text-transform-label">文字变换</span>
         <span class="text-transform-corner" title="拖拽缩放"></span>
         <span class="text-transform-rotate" title="拖拽旋转">↻</span>
+      </div>
+
+      <div id="sticker-transform-handle" class="sticker-transform-handle" hidden>
+        <span id="sticker-handle-label" class="sticker-handle-label">贴图</span>
+        <button id="sticker-handle-delete" class="sticker-handle-delete" type="button" title="删除贴图" aria-label="删除贴图">×</button>
+        <span class="sticker-transform-corner" title="拖拽缩放"></span>
+        <span class="sticker-transform-rotate" title="拖拽旋转">↻</span>
       </div>
 
       <!-- 边框拖拽调整句柄 -->
@@ -788,6 +813,10 @@
       </svg>
       边框
     </button>
+    <button class="mobile-nav-tab" data-panel="stickers">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 13 13 20a2 2 0 0 1-3 0l-6-6a2 2 0 0 1 0-3l7-7h7a2 2 0 0 1 2 2Z"/><circle cx="15" cy="9" r="1.5"/></svg>
+      贴图
+    </button>
     <button class="mobile-nav-tab" data-panel="export">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -847,6 +876,7 @@
           <label class="sync-option"><input id="sync-text-style" type="checkbox" checked><span class="sync-check"></span><span><strong>文字样式与变换</strong><small>字体、大小、颜色、位置、旋转与缩放</small></span></label>
           <label class="sync-option"><input id="sync-text-content" type="checkbox"><span class="sync-check"></span><span><strong>文字内容</strong><small>地点、相机、胶卷、日期与自定义文字</small></span></label>
           <label class="sync-option"><input id="sync-crop" type="checkbox"><span class="sync-check"></span><span><strong>构图裁切</strong><small>按比例同步裁切位置，不同尺寸照片会自动换算</small></span></label>
+          <label class="sync-option"><input id="sync-stickers" type="checkbox" checked><span class="sync-check"></span><span><strong>贴图与位置</strong><small>同步贴图、层级、大小、旋转、透明度与相对位置</small></span></label>
         </div>
       </div>
 
@@ -880,6 +910,7 @@
 <script src="js/canvas-renderer.js"></script>
 <script src="js/crop-editor.js"></script>
 <script src="js/collage-layouts.js"></script>
+<script src="js/sticker-library.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/session-store.js"></script>
 <script src="js/batch-processor.js"></script>

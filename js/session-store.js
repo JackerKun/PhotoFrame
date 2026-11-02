@@ -10,7 +10,7 @@
  */
 window.SessionStore = (() => {
   const DB_NAME    = 'PhotoFrameDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let _db = null;
 
   // ── 打开数据库 ───────────────────────────────────────────────────────────
@@ -26,6 +26,8 @@ window.SessionStore = (() => {
           db.createObjectStore('jobs',  { keyPath: 'id' });
         if (!db.objectStoreNames.contains('session'))
           db.createObjectStore('session', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('stickers'))
+          db.createObjectStore('stickers', { keyPath: 'id' });
       };
       req.onsuccess = e => { _db = e.target.result; resolve(_db); };
       req.onerror   = e => reject(e.target.error);
@@ -175,5 +177,20 @@ window.SessionStore = (() => {
     return { usage, quota };
   }
 
-  return { open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll, estimate };
+  async function saveSticker(sticker) {
+    await open();
+    await idbPut('stickers', sticker);
+  }
+
+  async function listStickers() {
+    await open();
+    return idbGetAll('stickers');
+  }
+
+  async function deleteSticker(id) {
+    await open();
+    await idbDelete('stickers', id);
+  }
+
+  return { open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll, estimate, saveSticker, listStickers, deleteSticker };
 })();
