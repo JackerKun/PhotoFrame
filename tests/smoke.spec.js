@@ -55,6 +55,44 @@ test('professional theme and style controls affect the canvas', async ({ page },
   await page.screenshot({ path: '/tmp/photoframe-professional.png', fullPage: true });
 });
 
+test('syncs the first photo style to following photos without replacing unique content', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.locator('#file-input').setInputFiles([
+    { name: 'first.svg', mimeType: 'image/svg+xml', buffer: svg },
+    { name: 'second.svg', mimeType: 'image/svg+xml', buffer: svg },
+    { name: 'third.svg', mimeType: 'image/svg+xml', buffer: svg },
+  ]);
+  await expect(page.locator('#sync-count-badge')).toHaveText('2');
+  await page.locator('.strip-item').nth(1).click();
+  await page.locator('.panel-tab[data-tab="info"]').click();
+  await page.locator('#input-location').fill('上海·外滩');
+  await page.locator('.strip-item').first().click();
+  await page.locator('.panel-tab[data-tab="border"]').click();
+  await page.locator('#background-mode').selectOption('linear');
+  await page.locator('#background-color-2').evaluate(el => { el.value = '#315c8c'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.locator('#font-scale').fill('1.45');
+
+  await page.locator('#btn-sync-edits').click();
+  await expect(page.locator('#sync-edits-overlay')).toBeVisible();
+  await expect(page.locator('#sync-source-summary')).toContainText('first.svg');
+  await expect(page.locator('#sync-frame-style')).toBeChecked();
+  await expect(page.locator('#sync-text-style')).toBeChecked();
+  await expect(page.locator('#sync-text-content')).not.toBeChecked();
+  await expect(page.locator('#sync-crop')).not.toBeChecked();
+  await page.screenshot({ path: '/tmp/photoframe-sync-modal.png', fullPage: true });
+  await page.locator('#btn-sync-confirm').click();
+  await expect(page.locator('#sync-edits-overlay')).toBeHidden();
+
+  await page.locator('.strip-item').nth(1).click();
+  await expect(page.locator('#background-mode')).toHaveValue('linear');
+  await expect(page.locator('#background-color-2')).toHaveValue('#315c8c');
+  await expect(page.locator('#font-scale')).toHaveValue('1.45');
+  await expect(page.locator('#input-location')).toHaveValue('上海·外滩');
+  await page.locator('#btn-undo').click();
+  await page.locator('.strip-item').nth(1).click();
+  await expect(page.locator('#background-mode')).toHaveValue('solid');
+});
+
 test('collage professional styling renders', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#file-input').setInputFiles([

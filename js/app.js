@@ -216,7 +216,11 @@
     if (!state.activeJobId) selectJob(state.jobs[0].id);
     updateFilmstrip();
     updateEmptyState();
-    showToast(`已添加 ${imageFiles.length} 张照片`);
+    if (state.jobs.length > 1) {
+      showToast(`已添加 ${imageFiles.length} 张：调好当前照片后，可用顶部同步按钮应用到后续照片`);
+      document.getElementById('btn-sync-edits')?.classList.add('sync-attention');
+      setTimeout(() => document.getElementById('btn-sync-edits')?.classList.remove('sync-attention'), 4500);
+    } else showToast(`已添加 ${imageFiles.length} 张照片`);
   }
 
   async function createThumb(job, onDone) {
@@ -1476,7 +1480,9 @@
     if (!preset) return;
 
     const btn = document.getElementById('btn-export-single');
-    if (btn) { btn.disabled = true; btn.textContent = '导出中…'; }
+    const panelBtn = document.getElementById('btn-export-single2');
+    if (btn) { btn.disabled = true; btn.classList.add('is-busy'); btn.dataset.tooltip = '正在导出…'; btn.setAttribute('aria-label', '正在导出'); }
+    if (panelBtn) { panelBtn.disabled = true; panelBtn.textContent = '导出中…'; }
 
     try {
       const mergedPreset = buildMergedPreset(preset, job);
@@ -1485,7 +1491,8 @@
     } catch (e) {
       showToast('导出失败: ' + e.message, 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '保存照片'; }
+      if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); btn.dataset.tooltip = '保存当前照片'; btn.setAttribute('aria-label', '保存当前照片'); }
+      if (panelBtn) { panelBtn.disabled = false; panelBtn.textContent = '保存当前照片'; }
     }
   }
 
@@ -1494,8 +1501,10 @@
     if (typeof saveAs === 'undefined') { showToast('FileSaver 未加载', 'error'); return; }
 
     const btn = document.getElementById('btn-export-batch');
+    const panelBtn = document.getElementById('btn-export-batch2');
     const progress = document.getElementById('batch-progress');
-    if (btn) { btn.disabled = true; }
+    if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+    if (panelBtn) panelBtn.disabled = true;
     if (progress) { progress.hidden = false; }
 
     try {
@@ -1508,14 +1517,19 @@
         },
         (done, total) => {
           if (progress) progress.value = done / total;
-          if (btn) btn.textContent = `处理中 ${done}/${total}…`;
+          const badge = document.getElementById('batch-count-badge');
+          if (badge) badge.textContent = `${done}/${total}`;
+          if (btn) { btn.dataset.tooltip = `处理中 ${done}/${total}`; btn.setAttribute('aria-label', `处理中 ${done}/${total}`); }
+          if (panelBtn) panelBtn.textContent = `处理中 ${done}/${total}…`;
         }
       );
       showToast(result.failed.length ? `已导出 ${result.success} 张，${result.failed.length} 张失败` : `${result.success} 张照片已打包下载`, result.failed.length ? 'warn' : 'info');
     } catch (e) {
       showToast('批量导出失败: ' + e.message, 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = `批量导出 (${state.jobs.length})张`; }
+      if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); btn.dataset.tooltip = '批量导出 ZIP'; btn.setAttribute('aria-label', '批量导出 ZIP'); }
+      const badge = document.getElementById('batch-count-badge'); if (badge) badge.textContent = state.jobs.length;
+      if (panelBtn) { panelBtn.disabled = false; panelBtn.textContent = '批量导出 ZIP'; }
       if (progress) { progress.hidden = true; progress.value = 0; }
     }
   }
@@ -1842,8 +1856,12 @@
     const hasJobs     = state.jobs.length > 0;
     if (emptyState)  emptyState.hidden  = hasJobs;
     if (previewArea) previewArea.hidden = !hasJobs;
-    const btnBatch = document.getElementById('btn-export-batch');
-    if (btnBatch) btnBatch.textContent = `批量导出 (${state.jobs.length}张)`;
+    const batchBadge = document.getElementById('batch-count-badge');
+    if (batchBadge) batchBadge.textContent = state.jobs.length;
+    const syncBadge = document.getElementById('sync-count-badge');
+    if (syncBadge) { syncBadge.textContent = Math.max(0, state.jobs.length - 1); syncBadge.hidden = state.jobs.length < 2; }
+    const syncBtn = document.getElementById('btn-sync-edits');
+    if (syncBtn) syncBtn.disabled = state.jobs.length < 2;
     ['btn-export-single', 'btn-export-single2', 'btn-export-batch', 'btn-export-batch2', 'btn-compare']
       .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !hasJobs; });
     const btnClear = document.getElementById('btn-clear-session');
@@ -1918,19 +1936,111 @@
     if (redoBtn) redoBtn.disabled = !state.redoStack.length;
   }
 
-  function copyStyleTo(targets) {
+  function getSyncTargets(mode) {
     const source = activeJob();
-    if (!source) return;
-    recordHistory('批量应用样式');
-    targets.forEach(job => {
-      if (job.id === source.id) return;
-      job.presetId = source.presetId;
-      job.borderOverrides = structuredClone(source.borderOverrides || {});
-      job.infoOverrides = structuredClone(source.infoOverrides || {});
-      job.frameLayout = structuredClone(source.frameLayout || null);
-    });
-    scheduleSessionSave();
-    showToast(`已应用到 ${targets.length} 张照片`);
+    if (!source) return [];
+    if (mode === 'selected') return state.jobs.filter(j => j.id !== source.id && state.selectedJobIds.has(j.id));
+    if (mode === 'remaining') {
+      const index = state.jobs.findIndex(j => j.id === source.id);
+      return state.jobs.slice(index + 1);
+    }
+    return state.jobs.filter(j => j.id !== source.id);
+  }
+
+  function openSyncModal(defaultTarget = 'remaining') {
+    const source = activeJob();
+    if (!source || state.jobs.length < 2) return showToast('请先导入至少两张照片', 'warn');
+    const overlay = document.getElementById('sync-edits-overlay');
+    if (!overlay) return;
+    const remaining = getSyncTargets('remaining').length;
+    const selected = getSyncTargets('selected').length;
+    const all = getSyncTargets('all').length;
+    document.getElementById('sync-remaining-count').textContent = remaining;
+    document.getElementById('sync-selected-count').textContent = selected;
+    document.getElementById('sync-all-count').textContent = all;
+    document.getElementById('sync-source-summary').textContent = `以「${source.file.name}」为样板`;
+    const radio = document.querySelector(`input[name="sync-target"][value="${defaultTarget}"]`);
+    if (radio) radio.checked = true;
+    overlay.hidden = false;
+    document.getElementById('btn-sync-confirm')?.focus();
+  }
+
+  function closeSyncModal() {
+    const overlay = document.getElementById('sync-edits-overlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  function pickInfoFields(info, keys) {
+    const out = {};
+    keys.forEach(key => { if (Object.prototype.hasOwnProperty.call(info, key)) out[key] = structuredClone(info[key]); });
+    return out;
+  }
+
+  async function normalizedCropForTarget(source, target) {
+    if (!source.cropRect) return null;
+    const [sourceImage, targetImage] = await Promise.all([getJobImage(source), getJobImage(target)]);
+    const crop = source.cropRect;
+    return {
+      sx: Math.round(crop.sx / sourceImage.naturalWidth * targetImage.naturalWidth),
+      sy: Math.round(crop.sy / sourceImage.naturalHeight * targetImage.naturalHeight),
+      sw: Math.round(crop.sw / sourceImage.naturalWidth * targetImage.naturalWidth),
+      sh: Math.round(crop.sh / sourceImage.naturalHeight * targetImage.naturalHeight),
+    };
+  }
+
+  async function applySyncEdits() {
+    const source = activeJob();
+    const mode = document.querySelector('input[name="sync-target"]:checked')?.value || 'remaining';
+    const targets = getSyncTargets(mode);
+    if (!source || !targets.length) return showToast('当前范围没有可同步的照片', 'warn');
+    const syncFrame = document.getElementById('sync-frame-style').checked;
+    const syncTextStyle = document.getElementById('sync-text-style').checked;
+    const syncTextContent = document.getElementById('sync-text-content').checked;
+    const syncCrop = document.getElementById('sync-crop').checked;
+    if (![syncFrame, syncTextStyle, syncTextContent, syncCrop].some(Boolean)) return showToast('请至少选择一项同步内容', 'warn');
+
+    const button = document.getElementById('btn-sync-confirm');
+    const label = button?.querySelector('span');
+    if (button) button.disabled = true;
+    recordHistory(`同步到 ${targets.length} 张照片`);
+    const contentKeys = ['titleTemplate', 'subtitleTemplate', 'extraLines'];
+    const sourcePreset = state.presets.find(p => p.id === source.presetId) || activePreset();
+    const sourceFinalInfo = Object.assign({}, sourcePreset?.infoBar || {}, source.infoOverrides || {});
+    const styleKeys = Object.keys(sourceFinalInfo).filter(key => !contentKeys.includes(key));
+
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        if (label) label.textContent = `同步中 ${i + 1}/${targets.length}`;
+        if (syncFrame) {
+          target.presetId = source.presetId;
+          target.borderOverrides = structuredClone(source.borderOverrides || {});
+          target.frameLayout = structuredClone(source.frameLayout || null);
+        }
+        if (syncTextStyle || syncTextContent) {
+          const targetInfo = structuredClone(target.infoOverrides || {});
+          if (syncTextStyle) {
+            const preservedContent = pickInfoFields(targetInfo, contentKeys);
+            target.infoOverrides = { ...pickInfoFields(sourceFinalInfo, styleKeys), ...preservedContent };
+          }
+          if (syncTextContent) {
+            target.infoOverrides ||= targetInfo;
+            Object.assign(target.infoOverrides, pickInfoFields(sourceFinalInfo, contentKeys));
+            target.overrides = structuredClone(source.overrides || {});
+          }
+        }
+        if (syncCrop) target.cropRect = await normalizedCropForTarget(source, target);
+      }
+      updateFilmstrip();
+      scheduleSessionSave();
+      closeSyncModal();
+      showToast(`已将当前编辑同步到 ${targets.length} 张照片`);
+    } catch (e) {
+      showToast('同步失败：' + e.message, 'error');
+    } finally {
+      if (button) button.disabled = false;
+      if (label) label.textContent = '开始同步';
+    }
   }
 
   async function showOriginal() {
@@ -1952,12 +2062,17 @@
     const search = document.getElementById('preset-search');
     search?.addEventListener('input', () => { state.presetQuery = search.value; filterAndRenderCards(); });
     document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      if (e.key === 'Escape' && !document.getElementById('sync-edits-overlay')?.hidden) closeSyncModal();
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
       else if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement?.tagName || '')) { e.preventDefault(); search?.focus(); }
     });
     document.getElementById('btn-undo')?.addEventListener('click', undo);
     document.getElementById('btn-redo')?.addEventListener('click', redo);
+    document.getElementById('btn-sync-edits')?.addEventListener('click', () => openSyncModal('remaining'));
+    document.getElementById('btn-sync-cancel')?.addEventListener('click', closeSyncModal);
+    document.getElementById('btn-sync-confirm')?.addEventListener('click', applySyncEdits);
+    document.getElementById('sync-edits-overlay')?.addEventListener('click', e => { if (e.target.id === 'sync-edits-overlay') closeSyncModal(); });
 
     const compare = document.getElementById('btn-compare');
     ['pointerdown', 'touchstart'].forEach(type => compare?.addEventListener(type, e => { e.preventDefault(); showOriginal(); }));
@@ -1973,11 +2088,10 @@
       fillBorderForm(preset, job); schedulePreview();
     });
     document.getElementById('btn-apply-selected')?.addEventListener('click', () => {
-      const targets = state.jobs.filter(j => state.selectedJobIds.has(j.id));
-      if (targets.length < 2) return showToast('请先在底部胶片条多选照片', 'warn');
-      copyStyleTo(targets);
+      if (!getSyncTargets('selected').length) return showToast('请先按住 Ctrl/⌘ 在底部胶片条多选目标照片', 'warn');
+      openSyncModal('selected');
     });
-    document.getElementById('btn-apply-all')?.addEventListener('click', () => copyStyleTo(state.jobs));
+    document.getElementById('btn-apply-all')?.addEventListener('click', () => openSyncModal('all'));
 
     const filename = document.getElementById('output-filename');
     filename?.addEventListener('input', () => { state.exportFilenameTemplate = filename.value.trim() || '{name}_frame_{index}'; });

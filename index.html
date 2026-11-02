@@ -37,8 +37,8 @@
     </div>
 
     <div class="topbar-actions">
-      <label class="theme-picker" title="界面主题">
-        <span>主题</span>
+      <label class="theme-picker toolbar-select" title="切换界面主题" data-tooltip="切换界面主题">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 .6-3.5 1.4 1.4 0 0 1 .5-2.7H17A4 4 0 0 0 21 11a8 8 0 0 0-9-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>
         <select id="theme-select" aria-label="界面主题">
           <option value="studio">影棚白</option>
           <option value="darkroom">暗房黑</option>
@@ -50,14 +50,15 @@
         <div class="render-spinner"></div>
         <span>渲染中</span>
       </div>
-      <button id="btn-clear-session" class="btn btn-ghost" hidden>清空</button>
+      <button id="btn-clear-session" class="toolbar-btn" title="清空当前会话" data-tooltip="清空当前会话" aria-label="清空当前会话" hidden><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg></button>
       <div class="history-actions" aria-label="编辑历史">
-        <button id="btn-undo" class="icon-btn" type="button" title="撤销（Ctrl/⌘ Z）" aria-label="撤销" disabled>↶</button>
-        <button id="btn-redo" class="icon-btn" type="button" title="重做（Ctrl/⌘ Shift Z）" aria-label="重做" disabled>↷</button>
+        <button id="btn-undo" class="toolbar-btn" type="button" title="撤销（Ctrl/⌘ Z）" data-tooltip="撤销" aria-label="撤销" disabled><svg viewBox="0 0 24 24"><path d="m9 7-5 5 5 5M5 12h8a6 6 0 0 1 6 6"/></svg></button>
+        <button id="btn-redo" class="toolbar-btn" type="button" title="重做（Ctrl/⌘ Shift Z）" data-tooltip="重做" aria-label="重做" disabled><svg viewBox="0 0 24 24"><path d="m15 7 5 5-5 5m4-5h-8a6 6 0 0 0-6 6"/></svg></button>
       </div>
-      <button id="btn-compare" class="btn btn-secondary" type="button" title="按住查看原图" disabled>查看原图</button>
-      <button id="btn-export-batch" class="btn btn-secondary" disabled>批量导出 (0张)</button>
-      <button id="btn-export-single" class="btn btn-primary" disabled>保存照片</button>
+      <button id="btn-sync-edits" class="toolbar-btn toolbar-btn-accent" type="button" title="将当前修改同步到其他照片" data-tooltip="同步当前修改" aria-label="同步当前修改" disabled><svg viewBox="0 0 24 24"><path d="M20 7h-8m4-4 4 4-4 4M4 17h8m-4-4-4 4 4 4"/></svg><span id="sync-count-badge" class="tool-badge" hidden>0</span></button>
+      <button id="btn-compare" class="toolbar-btn" type="button" title="按住查看原图" data-tooltip="按住查看原图" aria-label="按住查看原图" disabled><svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button id="btn-export-batch" class="toolbar-btn" title="批量导出 ZIP" data-tooltip="批量导出 ZIP" aria-label="批量导出 ZIP" disabled><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM8 4h8l2 3M12 10v7m-3-3 3 3 3-3"/></svg><span id="batch-count-badge" class="tool-badge">0</span></button>
+      <button id="btn-export-single" class="toolbar-btn toolbar-btn-primary" title="保存当前照片" data-tooltip="保存当前照片" aria-label="保存当前照片" disabled><svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 18v2h16v-2"/></svg></button>
     </div>
   </header>
 
@@ -158,9 +159,9 @@
       <div class="tab-content" id="tab-border" hidden>
 
         <div class="quick-actions" aria-label="批量应用设置">
-          <button id="btn-reset-style" class="btn btn-secondary btn-compact" type="button">恢复预设</button>
-          <button id="btn-apply-selected" class="btn btn-secondary btn-compact" type="button">应用到已选</button>
-          <button id="btn-apply-all" class="btn btn-secondary btn-compact" type="button">应用到全部</button>
+          <button id="btn-reset-style" class="icon-action" type="button" title="恢复当前预设" aria-label="恢复当前预设"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2-5.3M4 4v6h6"/></svg></button>
+          <button id="btn-apply-selected" class="icon-action" type="button" title="同步到已选照片" aria-label="同步到已选照片"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="12" height="12" rx="2"/><path d="M8 3h9a4 4 0 0 1 4 4v9M8 11l2 2 4-5"/></svg></button>
+          <button id="btn-apply-all" class="icon-action" type="button" title="打开批量同步面板" aria-label="打开批量同步面板"><svg viewBox="0 0 24 24"><path d="M20 7h-8m4-4 4 4-4 4M4 17h8m-4-4-4 4 4 4"/></svg></button>
         </div>
 
         <div class="section-title">画布背景</div>
@@ -759,6 +760,40 @@
   </div>
 
   <!-- 照片选择器 Modal -->
+  <div class="modal-overlay" id="sync-edits-overlay" hidden>
+    <div class="modal sync-modal" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
+      <div class="sync-modal-head">
+        <div class="sync-modal-icon"><svg viewBox="0 0 24 24"><path d="M20 7h-8m4-4 4 4-4 4M4 17h8m-4-4-4 4 4 4"/></svg></div>
+        <div><h3 id="sync-modal-title">同步当前编辑</h3><p id="sync-source-summary">以当前照片为样板</p></div>
+      </div>
+
+      <div class="sync-section">
+        <span class="sync-section-label">同步到</span>
+        <div class="sync-targets" role="radiogroup" aria-label="同步目标">
+          <label><input type="radio" name="sync-target" value="remaining" checked><span>后续照片 <b id="sync-remaining-count">0</b></span></label>
+          <label><input type="radio" name="sync-target" value="selected"><span>已选照片 <b id="sync-selected-count">0</b></span></label>
+          <label><input type="radio" name="sync-target" value="all"><span>全部其他 <b id="sync-all-count">0</b></span></label>
+        </div>
+      </div>
+
+      <div class="sync-section">
+        <span class="sync-section-label">同步内容</span>
+        <div class="sync-options">
+          <label class="sync-option recommended"><input id="sync-frame-style" type="checkbox" checked><span class="sync-check"></span><span><strong>画幅与边框</strong><small>预设、边距、背景、纹理、描边与投影</small></span><em>推荐</em></label>
+          <label class="sync-option"><input id="sync-text-style" type="checkbox" checked><span class="sync-check"></span><span><strong>文字样式与变换</strong><small>字体、大小、颜色、位置、旋转与缩放</small></span></label>
+          <label class="sync-option"><input id="sync-text-content" type="checkbox"><span class="sync-check"></span><span><strong>文字内容</strong><small>地点、相机、胶卷、日期与自定义文字</small></span></label>
+          <label class="sync-option"><input id="sync-crop" type="checkbox"><span class="sync-check"></span><span><strong>构图裁切</strong><small>按比例同步裁切位置，不同尺寸照片会自动换算</small></span></label>
+        </div>
+      </div>
+
+      <div class="sync-safety-note"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-5"/></svg><span>默认保留每张照片的 EXIF 和构图。整次同步可一次撤销。</span></div>
+      <div class="modal-actions">
+        <button id="btn-sync-cancel" class="btn btn-secondary">取消</button>
+        <button id="btn-sync-confirm" class="btn btn-primary"><svg viewBox="0 0 24 24"><path d="M20 7h-8m4-4 4 4-4 4M4 17h8m-4-4-4 4 4 4"/></svg><span>开始同步</span></button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="photo-picker-overlay" hidden>
     <div class="modal photo-picker-modal">
       <h3>选择照片</h3>
