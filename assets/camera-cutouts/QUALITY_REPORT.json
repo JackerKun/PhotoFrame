@@ -1,0 +1,261 @@
+{
+  "refreshedAt": "2026-11-02T06:47:18.089Z",
+  "assets": [
+    {
+      "id": "bronica-etr",
+      "status": "updated",
+      "sourceWidth": 3872,
+      "sourceHeight": 2592,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 937
+    },
+    {
+      "id": "bronica-sq",
+      "status": "updated",
+      "sourceWidth": 1329,
+      "sourceHeight": 1329,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1400
+    },
+    {
+      "id": "canon-ae1",
+      "status": "updated",
+      "sourceWidth": 1890,
+      "sourceHeight": 1272,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 942
+    },
+    {
+      "id": "canon-f1",
+      "status": "updated",
+      "sourceWidth": 2212,
+      "sourceHeight": 1693,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1072
+    },
+    {
+      "id": "canon-p",
+      "status": "updated",
+      "sourceWidth": 800,
+      "sourceHeight": 544,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 952
+    },
+    {
+      "id": "contax-t2",
+      "status": "updated",
+      "sourceWidth": 800,
+      "sourceHeight": 583,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1020
+    },
+    {
+      "id": "diana-f",
+      "status": "updated",
+      "sourceWidth": 3516,
+      "sourceHeight": 2344,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 933
+    },
+    {
+      "id": "fuji-g617",
+      "status": "updated",
+      "sourceWidth": 1500,
+      "sourceHeight": 1193,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1113
+    },
+    {
+      "id": "fuji-gx680",
+      "status": "updated",
+      "sourceWidth": 2851,
+      "sourceHeight": 1901,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 933
+    },
+    {
+      "id": "holga-120",
+      "status": "updated",
+      "sourceWidth": 2500,
+      "sourceHeight": 2500,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1400
+    },
+    {
+      "id": "kiev-88",
+      "status": "updated",
+      "sourceWidth": 3540,
+      "sourceHeight": 2832,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1120
+    },
+    {
+      "id": "konica-c35",
+      "status": "updated",
+      "sourceWidth": 1024,
+      "sourceHeight": 751,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1027
+    },
+    {
+      "id": "leica-m4",
+      "status": "updated",
+      "sourceWidth": 432,
+      "sourceHeight": 288,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 933
+    },
+    {
+      "id": "mamiya-rb67",
+      "status": "updated",
+      "sourceWidth": 2714,
+      "sourceHeight": 4071,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 2100
+    },
+    {
+      "id": "minolta-autocord",
+      "status": "updated",
+      "sourceWidth": 3648,
+      "sourceHeight": 2736,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1050
+    },
+    {
+      "id": "minolta-x700",
+      "status": "updated",
+      "sourceWidth": 5377,
+      "sourceHeight": 3585,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 933
+    },
+    {
+      "id": "nikon-f",
+      "status": "updated",
+      "sourceWidth": 3217,
+      "sourceHeight": 2130,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 927
+    },
+    {
+      "id": "nikon-f2",
+      "status": "updated",
+      "sourceWidth": 1024,
+      "sourceHeight": 973,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1330
+    },
+    {
+      "id": "olympus-om1",
+      "status": "updated",
+      "sourceWidth": 2128,
+      "sourceHeight": 1684,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1108
+    },
+    {
+      "id": "pentax-6x7",
+      "status": "updated",
+      "sourceWidth": 800,
+      "sourceHeight": 600,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1050
+    },
+    {
+      "id": "ricoh-gr1",
+      "status": "updated",
+      "sourceWidth": 937,
+      "sourceHeight": 1000,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1494
+    },
+    {
+      "id": "rolleicord",
+      "status": "updated",
+      "sourceWidth": 576,
+      "sourceHeight": 785,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1908
+    },
+    {
+      "id": "rolleiflex",
+      "status": "updated",
+      "sourceWidth": 747,
+      "sourceHeight": 984,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1844
+    },
+    {
+      "id": "leica-m2",
+      "status": "updated",
+      "sourceWidth": 1833,
+      "sourceHeight": 1222,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 933
+    },
+    {
+      "id": "mamiya-645",
+      "status": "updated",
+      "sourceWidth": 1230,
+      "sourceHeight": 1000,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1138
+    },
+    {
+      "id": "mamiya-645super",
+      "status": "updated",
+      "sourceWidth": 1230,
+      "sourceHeight": 1000,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1138
+    },
+    {
+      "id": "nikon-sp",
+      "status": "updated",
+      "sourceWidth": 2424,
+      "sourceHeight": 1608,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 929
+    },
+    {
+      "id": "polaroid-sx70",
+      "status": "updated",
+      "sourceWidth": 1024,
+      "sourceHeight": 1024,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1400
+    },
+    {
+      "id": "rollei-35",
+      "status": "updated",
+      "sourceWidth": 1024,
+      "sourceHeight": 768,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 1050
+    },
+    {
+      "id": "yashica-mat",
+      "status": "updated",
+      "sourceWidth": 1848,
+      "sourceHeight": 2772,
+      "downloadedWidth": 1400,
+      "downloadedHeight": 2100
+    },
+    {
+      "id": "hasselblad-1600f",
+      "status": "http-429"
+    },
+    {
+      "id": "leica-m6",
+      "status": "http-429"
+    },
+    {
+      "id": "nikon-f3",
+      "status": "http-429"
+    },
+    {
+      "id": "nikon-fm2",
+      "status": "http-429"
+    }
+  ]
+}

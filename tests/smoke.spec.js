@@ -7,6 +7,51 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.topbar-logo')).toContainText('PhotoFrame');
 });
 
+test('preset backup exports and restores custom presets', async ({ page }, testInfo) => {
+  await page.evaluate(() => {
+    const source = window.PRESETS[0];
+    Storage.saveCustomPreset({
+      ...JSON.parse(JSON.stringify(source)),
+      id: 'custom-backup-test',
+      name: '可恢复的胶片预设',
+      category: 'custom',
+      isCustom: true,
+    });
+    Storage.setNameOverride(source.id, '我的 135 样式');
+    Storage.toggleFavorite(source.id);
+  });
+  await page.reload();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#btn-export-presets').evaluate(button => button.click());
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^photoframe-presets-\d{4}-\d{2}-\d{2}\.json$/);
+  const backup = JSON.parse(await require('node:fs/promises').readFile(await download.path(), 'utf8'));
+  expect(backup.format).toBe('photoframe-presets');
+  expect(backup.customPresets.some(preset => preset.id === 'custom-backup-test')).toBeTruthy();
+
+  await page.evaluate(() => {
+    ['pf_custom_presets', 'pf_preset_names', 'pf_hidden_presets', 'pf_favorite_presets'].forEach(key => localStorage.removeItem(key));
+  });
+  await page.reload();
+  await page.locator('#preset-import-input').setInputFiles({
+    name: 'photoframe-presets.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  });
+  if (testInfo.project.name === 'mobile') {
+    await page.evaluate(() => document.querySelector('#panel-left').classList.add('mobile-open'));
+  }
+  await expect(page.locator('.preset-card').filter({ hasText: '可恢复的胶片预设' })).toHaveCount(1);
+  await expect(page.locator('#toast')).toContainText('预设导入完成');
+  const restored = await page.evaluate(() => ({
+    custom: Storage.getCustomPresets().some(preset => preset.id === 'custom-backup-test'),
+    renamed: Object.values(Storage.getNameOverrides()).includes('我的 135 样式'),
+    favorite: Storage.getFavoriteIds().length > 0,
+  }));
+  expect(restored).toEqual({ custom: true, renamed: true, favorite: true });
+});
+
 test('upload, preset search, edit history and export state', async ({ page }, testInfo) => {
   await expect(page.locator('#btn-export-single')).toBeDisabled();
   await page.locator('#file-input').setInputFiles({ name: 'sample.svg', mimeType: 'image/svg+xml', buffer: svg });

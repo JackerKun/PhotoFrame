@@ -140,6 +140,7 @@
     setupExportControls();
     setupZoomControls();
     setupPresetSave();
+    setupPresetBackup();
     setupMobileNav();
     setupCropMode();       // 裁切模式
     setupCollageMode();    // 拼图模式
@@ -2016,6 +2017,40 @@
     if (modal) {
       modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
     }
+  }
+
+  function setupPresetBackup() {
+    const btnExport = document.getElementById('btn-export-presets');
+    const btnImport = document.getElementById('btn-import-presets');
+    const fileInput = document.getElementById('preset-import-input');
+
+    btnExport?.addEventListener('click', () => {
+      if (typeof saveAs === 'undefined') return showToast('下载组件未加载', 'error');
+      const bundle = Storage.exportPresetBundle();
+      const date = new Date().toISOString().slice(0, 10);
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json;charset=utf-8' });
+      saveAs(blob, `photoframe-presets-${date}.json`);
+      showToast(`已导出 ${bundle.customPresets.length} 个自定义预设`);
+    });
+
+    btnImport?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) return showToast('预设备份不能超过 2 MB', 'error');
+      try {
+        const bundle = JSON.parse(await file.text());
+        const result = Storage.importPresetBundle(bundle);
+        state.presets = Storage.allPresets();
+        renderPresetGrid();
+        const parts = [`新增 ${result.added} 个`, `更新 ${result.updated} 个`];
+        if (result.skipped) parts.push(`跳过 ${result.skipped} 个无效项`);
+        showToast(`预设导入完成：${parts.join('，')}`, result.skipped ? 'warn' : 'info');
+      } catch (error) {
+        showToast(`导入失败：${error.message}`, 'error');
+      }
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════

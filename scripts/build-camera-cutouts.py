@@ -19,10 +19,10 @@ MANIFEST = ROOT / "js" / "camera-cutout-library.js"
 # list explicit prevents documentary photos, manuals and accessories from
 # silently entering the visible sticker library.
 SELECTED = {
-    "leica-m2", "leica-m4", "nikon-s2", "canon-p", "nikon-f", "nikon-f2",
+    "leica-m2", "leica-m4", "leica-m6", "nikon-sp", "canon-p", "nikon-f", "nikon-f2",
     "nikon-f3", "nikon-fm2", "canon-ae1", "canon-f1", "olympus-om1",
     "minolta-x700", "contax-t2", "ricoh-gr1", "konica-c35", "rollei-35",
-    "polaroid-sx70", "instax-wide", "hasselblad-1600f", "mamiya-rb67",
+    "polaroid-sx70", "hasselblad-1600f", "mamiya-rb67",
     "pentax-6x7", "bronica-sq", "kiev-88", "rolleiflex", "rolleicord",
     "yashica-mat", "minolta-autocord", "mamiya-645", "mamiya-645super",
     "bronica-etr", "fuji-gx680", "fuji-g617", "holga-120", "diana-f",
@@ -49,12 +49,29 @@ def background_palette(image: Image.Image) -> list[tuple[int, int, int]]:
     return [color for color, _ in quantized.most_common(10)]
 
 
-def foreground_alpha(image: Image.Image) -> Image.Image:
+def corner_palette(image: Image.Image) -> list[tuple[int, int, int]]:
+    rgb = image.convert("RGB")
+    width, height = rgb.size
+    band = max(12, min(width, height) // 12)
+    samples = []
+    for left, top in ((0, 0), (width - band, 0), (0, height - band), (width - band, height - band)):
+        for y in range(top, top + band, 3):
+            for x in range(left, left + band, 3):
+                samples.append(rgb.getpixel((x, y)))
+    quantized = Counter(tuple((channel // 20) * 20 + 10 for channel in color) for color in samples)
+    return [color for color, _ in quantized.most_common(8)]
+
+
+def foreground_alpha(image: Image.Image, camera_id: str) -> Image.Image:
     rgb = image.convert("RGB")
     width, height = rgb.size
     pixels = rgb.load()
-    palette = background_palette(rgb)
-    threshold_sq = 64 * 64
+    # Silver bodies on pale backgrounds and product shots touching an edge can
+    # accidentally contribute camera colours to the edge palette. Use a tighter
+    # palette for the affected sources so metal and leather remain intact.
+    palette_limit, threshold = ((3, 42) if camera_id == "leica-m6" else (8, 82) if camera_id == "nikon-sp" else (10, 64))
+    palette = (corner_palette(rgb) if camera_id == "nikon-sp" else background_palette(rgb))[:palette_limit]
+    threshold_sq = threshold * threshold
     background_like = bytearray(width * height)
     for y in range(height):
         offset = y * width
@@ -96,8 +113,10 @@ def build_cutout(camera_id: str, metadata: dict) -> dict | None:
     if not source.exists():
         return None
     image = Image.open(source).convert("RGBA")
-    image.thumbnail((420, 420), Image.Resampling.LANCZOS)
-    alpha = foreground_alpha(image)
+    # Preserve enough detail for retina previews and large exports. The old
+    # 420 px intermediate became visibly soft after users scaled a sticker.
+    image.thumbnail((900, 900), Image.Resampling.LANCZOS)
+    alpha = foreground_alpha(image, camera_id)
     image.putalpha(alpha)
     bbox = alpha.point(lambda value: 255 if value > 22 else 0).getbbox()
     if not bbox:

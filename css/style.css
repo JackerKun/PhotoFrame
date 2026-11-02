@@ -334,6 +334,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+.preset-backup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.preset-backup-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.preset-backup-actions .btn > span[aria-hidden] {
+  font-size: 18px;
+  line-height: 1;
+}
+.preset-backup-note {
+  margin: -2px 0 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
 .preset-card {
   position: relative;
   display: flex;

@@ -2,7 +2,7 @@
 window.CameraCutoutLibrary = {
   "bronica-etr": {
     "src": "assets/camera-cutouts/bronica-etr.svg",
-    "ratio": 1.1912350597609562,
+    "ratio": 1.1913696060037524,
     "author": "Vincent Quach (Invincible)",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
@@ -11,7 +11,7 @@ window.CameraCutoutLibrary = {
   },
   "bronica-sq": {
     "src": "assets/camera-cutouts/bronica-sq.svg",
-    "ratio": 0.8117647058823529,
+    "ratio": 0.8095238095238095,
     "author": "No machine-readable author provided. Fg2 assumed (based on copyright claims).",
     "license": "Public domain",
     "licenseUrl": "",
@@ -20,7 +20,7 @@ window.CameraCutoutLibrary = {
   },
   "canon-ae1": {
     "src": "assets/camera-cutouts/canon-ae1.svg",
-    "ratio": 1.4413793103448276,
+    "ratio": 1.448051948051948,
     "author": "en:User:Cburnett",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -29,7 +29,7 @@ window.CameraCutoutLibrary = {
   },
   "canon-f1": {
     "src": "assets/camera-cutouts/canon-f1.svg",
-    "ratio": 1.2597014925373133,
+    "ratio": 1.2636746143057505,
     "author": "s58y",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
@@ -38,7 +38,7 @@ window.CameraCutoutLibrary = {
   },
   "canon-p": {
     "src": "assets/camera-cutouts/canon-p.svg",
-    "ratio": 1.4590747330960854,
+    "ratio": 1.4706994328922496,
     "author": "Original uploader was Riemann at da.wikipedia",
     "license": "Public domain",
     "licenseUrl": "",
@@ -47,7 +47,7 @@ window.CameraCutoutLibrary = {
   },
   "contax-t2": {
     "src": "assets/camera-cutouts/contax-t2.svg",
-    "ratio": 1.334375,
+    "ratio": 1.3394039735099337,
     "author": "User:Gisling",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -56,7 +56,7 @@ window.CameraCutoutLibrary = {
   },
   "diana-f": {
     "src": "assets/camera-cutouts/diana-f.svg",
-    "ratio": 1.1598360655737705,
+    "ratio": 1.1605415860735009,
     "author": "Siam Thanachai",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
@@ -65,7 +65,7 @@ window.CameraCutoutLibrary = {
   },
   "fuji-g617": {
     "src": "assets/camera-cutouts/fuji-g617.svg",
-    "ratio": 1.2209631728045325,
+    "ratio": 1.2517193947730398,
     "author": "Zebrio from Tokyo, Japan",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -74,7 +74,7 @@ window.CameraCutoutLibrary = {
   },
   "fuji-gx680": {
     "src": "assets/camera-cutouts/fuji-gx680.svg",
-    "ratio": 1.02880658436214,
+    "ratio": 1.0371819960861057,
     "author": "DYVER",
     "license": "CC BY-SA 4.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
@@ -83,7 +83,7 @@ window.CameraCutoutLibrary = {
   },
   "hasselblad-1600f": {
     "src": "assets/camera-cutouts/hasselblad-1600f.svg",
-    "ratio": 0.8544600938967136,
+    "ratio": 0.8552486187845304,
     "author": "Eugene Ilchenko",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -92,25 +92,16 @@ window.CameraCutoutLibrary = {
   },
   "holga-120": {
     "src": "assets/camera-cutouts/holga-120.svg",
-    "ratio": 1.4172661870503598,
+    "ratio": 1.4158249158249159,
     "author": "Bilby",
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
     "source": "https://commons.wikimedia.org/wiki/File:Holga_120SF_with_film.jpg",
     "title": "Holga 120SF with film.jpg"
   },
-  "instax-wide": {
-    "src": "assets/camera-cutouts/instax-wide.svg",
-    "ratio": 1.4462151394422311,
-    "author": "ChadPerez49",
-    "license": "CC BY-SA 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:FujifilmInstaxWide300March52019.jpg",
-    "title": "FujifilmInstaxWide300March52019.jpg"
-  },
   "kiev-88": {
     "src": "assets/camera-cutouts/kiev-88.svg",
-    "ratio": 1.134185303514377,
+    "ratio": 1.1357466063348416,
     "author": "Andrea Blankenstijn",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
@@ -119,7 +110,7 @@ window.CameraCutoutLibrary = {
   },
   "konica-c35": {
     "src": "assets/camera-cutouts/konica-c35.svg",
-    "ratio": 1.3176100628930818,
+    "ratio": 1.3176470588235294,
     "author": "Thomas Backa from Turku, Finland",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
@@ -128,7 +119,7 @@ window.CameraCutoutLibrary = {
   },
   "leica-m2": {
     "src": "assets/camera-cutouts/leica-m2.svg",
-    "ratio": 1.5291828793774318,
+    "ratio": 1.5338208409506398,
     "author": "Shane Lin",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
@@ -137,16 +128,25 @@ window.CameraCutoutLibrary = {
   },
   "leica-m4": {
     "src": "assets/camera-cutouts/leica-m4.svg",
-    "ratio": 1.1111111111111112,
+    "ratio": 1.104,
     "author": "Daniel Petrzelka, Daniel P",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File:Leica_M4_P_cropped.jpg",
     "title": "Leica M4 P cropped.jpg"
   },
+  "leica-m6": {
+    "src": "assets/camera-cutouts/leica-m6.svg",
+    "ratio": 1.3480055020632737,
+    "author": "Clemson",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Leica_M6_2301050876_ecf639c427_o.jpg",
+    "title": "Leica M6 2301050876 ecf639c427 o.jpg"
+  },
   "mamiya-645": {
     "src": "assets/camera-cutouts/mamiya-645.svg",
-    "ratio": 1.1734104046242775,
+    "ratio": 1.172554347826087,
     "author": "Eric Gaba (Sting - fr:Sting)",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -155,7 +155,7 @@ window.CameraCutoutLibrary = {
   },
   "mamiya-645super": {
     "src": "assets/camera-cutouts/mamiya-645super.svg",
-    "ratio": 1.1734104046242775,
+    "ratio": 1.172554347826087,
     "author": "Eric Gaba (Sting - fr:Sting)",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -164,7 +164,7 @@ window.CameraCutoutLibrary = {
   },
   "mamiya-rb67": {
     "src": "assets/camera-cutouts/mamiya-rb67.svg",
-    "ratio": 0.7142857142857143,
+    "ratio": 0.711217183770883,
     "author": "Eusebius",
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
@@ -173,7 +173,7 @@ window.CameraCutoutLibrary = {
   },
   "minolta-autocord": {
     "src": "assets/camera-cutouts/minolta-autocord.svg",
-    "ratio": 0.6177474402730375,
+    "ratio": 0.7271268057784912,
     "author": "David",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -182,7 +182,7 @@ window.CameraCutoutLibrary = {
   },
   "minolta-x700": {
     "src": "assets/camera-cutouts/minolta-x700.svg",
-    "ratio": 1.384297520661157,
+    "ratio": 1.3898635477582846,
     "author": "Martin Pettitt",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
@@ -191,7 +191,7 @@ window.CameraCutoutLibrary = {
   },
   "nikon-f": {
     "src": "assets/camera-cutouts/nikon-f.svg",
-    "ratio": 1.314487632508834,
+    "ratio": 1.5420711974110033,
     "author": "Dnalor 01",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
@@ -200,7 +200,7 @@ window.CameraCutoutLibrary = {
   },
   "nikon-f2": {
     "src": "assets/camera-cutouts/nikon-f2.svg",
-    "ratio": 1.1417525773195876,
+    "ratio": 1.142512077294686,
     "author": "Photopath at flickr",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -209,7 +209,7 @@ window.CameraCutoutLibrary = {
   },
   "nikon-f3": {
     "src": "assets/camera-cutouts/nikon-f3.svg",
-    "ratio": 1.2990033222591362,
+    "ratio": 1.3056426332288402,
     "author": "Photopath at flickr",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -218,25 +218,25 @@ window.CameraCutoutLibrary = {
   },
   "nikon-fm2": {
     "src": "assets/camera-cutouts/nikon-fm2.svg",
-    "ratio": 1.6214285714285714,
+    "ratio": 1.6340640809443507,
     "author": "Johan from Turku / Åbo (from Ostrobothnia), Finland",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
     "source": "https://commons.wikimedia.org/wiki/File:Nikon_FM2_black.jpg",
     "title": "Nikon FM2 black.jpg"
   },
-  "nikon-s2": {
-    "src": "assets/camera-cutouts/nikon-s2.svg",
-    "ratio": 2.3609022556390977,
-    "author": "s58y",
-    "license": "CC BY 2.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Nikon_S2_Rangefinder_(Chrome_Dial)_with_5cm_f-1.4_lens_(5585559178).jpg",
-    "title": "Nikon S2 Rangefinder (Chrome Dial) with 5cm f-1.4 lens (5585559178).jpg"
+  "nikon-sp": {
+    "src": "assets/camera-cutouts/nikon-sp.svg",
+    "ratio": 1.1924290220820188,
+    "author": "Dnalor 01",
+    "license": "CC BY-SA 3.0 at",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/at/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_SP_chrome_with_exposure_meter_and_NIKKOR-S_1,4_f%3D5cm.JPG",
+    "title": "Nikon SP chrome with exposure meter and NIKKOR-S 1,4 f=5cm.JPG"
   },
   "olympus-om1": {
     "src": "assets/camera-cutouts/olympus-om1.svg",
-    "ratio": 1.2034883720930232,
+    "ratio": 1.2095890410958905,
     "author": "s58y",
     "license": "CC BY 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
@@ -245,7 +245,7 @@ window.CameraCutoutLibrary = {
   },
   "pentax-6x7": {
     "src": "assets/camera-cutouts/pentax-6x7.svg",
-    "ratio": 1.2688821752265862,
+    "ratio": 1.269108280254777,
     "author": "Jan von Erpecom",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
@@ -254,7 +254,7 @@ window.CameraCutoutLibrary = {
   },
   "polaroid-sx70": {
     "src": "assets/camera-cutouts/polaroid-sx70.svg",
-    "ratio": 0.697841726618705,
+    "ratio": 0.6955056179775281,
     "author": "Stacie from USA",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -263,7 +263,7 @@ window.CameraCutoutLibrary = {
   },
   "ricoh-gr1": {
     "src": "assets/camera-cutouts/ricoh-gr1.svg",
-    "ratio": 0.9122401847575058,
+    "ratio": 0.9098805646036916,
     "author": "Zebrio from Tokyo, Japan",
     "license": "CC BY-SA 2.0",
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
@@ -272,7 +272,7 @@ window.CameraCutoutLibrary = {
   },
   "rollei-35": {
     "src": "assets/camera-cutouts/rollei-35.svg",
-    "ratio": 1.5633802816901408,
+    "ratio": 1.5643564356435644,
     "author": "D. Meyer",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -281,7 +281,7 @@ window.CameraCutoutLibrary = {
   },
   "rolleicord": {
     "src": "assets/camera-cutouts/rolleicord.svg",
-    "ratio": 0.5555555555555556,
+    "ratio": 0.5584415584415584,
     "author": "User Camerafiend on en.wikipedia",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -290,7 +290,7 @@ window.CameraCutoutLibrary = {
   },
   "rolleiflex": {
     "src": "assets/camera-cutouts/rolleiflex.svg",
-    "ratio": 0.765807962529274,
+    "ratio": 0.7640573318632855,
     "author": "Juhanson",
     "license": "CC BY-SA 3.0",
     "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
@@ -299,7 +299,7 @@ window.CameraCutoutLibrary = {
   },
   "yashica-mat": {
     "src": "assets/camera-cutouts/yashica-mat.svg",
-    "ratio": 0.6925133689839572,
+    "ratio": 0.6913425345043914,
     "author": "Eusebius",
     "license": "CC BY 3.0",
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",

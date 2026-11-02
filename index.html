@@ -105,6 +105,16 @@
         <div id="category-filter" class="category-filter"></div>
         <div id="preset-grid" class="preset-grid"></div>
         <button id="btn-save-preset" class="btn btn-outline">将当前参数保存为预设</button>
+        <div class="preset-backup-actions" aria-label="预设备份">
+          <button id="btn-import-presets" class="btn btn-outline" type="button" title="从 JSON 文件恢复预设">
+            <span aria-hidden="true">&#8593;</span><span>导入预设</span>
+          </button>
+          <button id="btn-export-presets" class="btn btn-outline" type="button" title="将预设备份为 JSON 文件">
+            <span aria-hidden="true">&#8595;</span><span>导出预设</span>
+          </button>
+          <input id="preset-import-input" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p class="preset-backup-note">清理浏览器缓存或更换设备前，请先导出预设备份。</p>
       </div>
 
       <!-- ── Tab: 信息 ────────────────────────────────────────────────── -->
