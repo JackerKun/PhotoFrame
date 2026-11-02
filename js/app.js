@@ -1773,7 +1773,48 @@
 
   function setupPreviewPanning(wrapper) {
     if (!wrapper) return;
-    wrapper.addEventListener('pointerdown', e => {
+    const borderOverlay = document.getElementById('border-resize-overlay');
+    const touchPointers = new Map();
+    let pinchState = null;
+
+    const pointerDistance = () => {
+      const points = [...touchPointers.values()];
+      if (points.length < 2) return 0;
+      return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    };
+
+    const stopPan = (releaseCapture = true) => {
+      if (releaseCapture && _panDragState && wrapper.hasPointerCapture?.(_panDragState.pointerId)) {
+        wrapper.releasePointerCapture(_panDragState.pointerId);
+      }
+      _panDragState = null;
+      wrapper.classList.remove('is-panning');
+    };
+
+    const startPointer = e => {
+      if (e.pointerType === 'touch') {
+        touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touchPointers.size >= 2) {
+          e.preventDefault();
+          e.stopPropagation();
+          stopPan(false);
+          touchPointers.forEach((_, pointerId) => wrapper.setPointerCapture?.(pointerId));
+          if (_borderDragState) {
+            _borderDragState = null;
+            document.body.classList.remove('border-frame-dragging');
+            borderOverlay?.querySelectorAll('.dragging').forEach(element => element.classList.remove('dragging'));
+            const preview = document.getElementById('canvas-preview');
+            if (preview) preview.style.transform = '';
+          }
+          const canvas = document.getElementById('canvas-preview');
+          const currentZoom = state.zoom === 'fit' && canvas?.width > 1
+            ? canvas.getBoundingClientRect().width / canvas.width
+            : Number(state.zoom) || 1;
+          pinchState = { distance: Math.max(1, pointerDistance()), zoom: currentZoom };
+          return;
+        }
+      }
+      if (e.currentTarget !== wrapper) return;
       if (!wrapper.classList.contains('is-pannable') || (e.button !== 0 && e.button !== 1)) return;
       // 文字工具开启时，文字框本身负责变换；框外仍允许抓手平移画布。
       if (state.cropMode || state.slotCropMode || state.borderResizeMode) return;
@@ -1787,20 +1828,53 @@
       };
       wrapper.setPointerCapture?.(e.pointerId);
       wrapper.classList.add('is-panning');
-    });
-    wrapper.addEventListener('pointermove', e => {
+    };
+    const movePointer = e => {
+      if (e.pointerType === 'touch' && touchPointers.has(e.pointerId)) {
+        touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+      if (pinchState && touchPointers.size >= 2) {
+        e.preventDefault();
+        const nextZoom = Math.max(0.2, Math.min(4, pinchState.zoom * pointerDistance() / pinchState.distance));
+        setZoom(nextZoom);
+        return;
+      }
+      if (e.currentTarget !== wrapper) return;
       if (!_panDragState || e.pointerId !== _panDragState.pointerId) return;
       wrapper.scrollLeft = _panDragState.scrollLeft - (e.clientX - _panDragState.startX);
       wrapper.scrollTop = _panDragState.scrollTop - (e.clientY - _panDragState.startY);
-    });
+    };
     const finishPan = e => {
+      if (e.pointerType === 'touch') {
+        touchPointers.delete(e.pointerId);
+        if (pinchState) {
+          if (wrapper.hasPointerCapture?.(e.pointerId)) wrapper.releasePointerCapture(e.pointerId);
+          if (touchPointers.size < 2) pinchState = null;
+          stopPan();
+          return;
+        }
+      }
+      if (e.currentTarget !== wrapper) return;
       if (!_panDragState || (e.pointerId != null && e.pointerId !== _panDragState.pointerId)) return;
       if (wrapper.hasPointerCapture?.(_panDragState.pointerId)) wrapper.releasePointerCapture(_panDragState.pointerId);
       _panDragState = null;
       wrapper.classList.remove('is-panning');
     };
+    wrapper.addEventListener('pointerdown', startPointer);
+    wrapper.addEventListener('pointermove', movePointer);
     wrapper.addEventListener('pointerup', finishPan);
     wrapper.addEventListener('pointercancel', finishPan);
+    if (borderOverlay) {
+      borderOverlay.addEventListener('pointerdown', startPointer, { capture: true });
+      borderOverlay.addEventListener('pointermove', movePointer, { capture: true });
+      borderOverlay.addEventListener('pointerup', finishPan, { capture: true });
+      borderOverlay.addEventListener('pointercancel', finishPan, { capture: true });
+    }
+    // iOS Safari 的旧版 gesture 事件也限制在画布内，避免放大整个网页。
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => {
+      wrapper.addEventListener(type, e => e.preventDefault(), { passive: false });
+      borderOverlay?.addEventListener(type, e => e.preventDefault(), { passive: false });
+    });
   }
 
   function updatePanAvailability() {
@@ -3309,7 +3383,13 @@
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = false;
     const tools = document.getElementById('frame-tools');
-    if (tools) tools.hidden = false;
+    if (tools) {
+      tools.hidden = false;
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        const toolbar = tools.closest('.preview-toolbar');
+        requestAnimationFrame(() => toolbar?.scrollTo({ left: Math.max(0, tools.offsetLeft - 10), behavior: 'auto' }));
+      }
+    }
     document.getElementById('btn-frame-grid')?.classList.toggle('active', state.frameGridEnabled);
     document.getElementById('btn-frame-snap')?.classList.toggle('active', state.frameSnapEnabled);
     updateBorderResizeHandles();
@@ -3322,6 +3402,9 @@
     if (overlay) overlay.hidden = true;
     const tools = document.getElementById('frame-tools');
     if (tools) tools.hidden = true;
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      tools?.closest('.preview-toolbar')?.scrollTo({ left: 0, behavior: 'auto' });
+    }
     document.getElementById('frame-grid')?.classList.remove('visible');
     _borderDragState = null;
     document.body.classList.remove('border-frame-dragging');

@@ -848,6 +848,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   #preview-wrapper {
     min-height:0;
     padding:12px;
+    touch-action:none;
     overscroll-behavior:contain;
     -webkit-overflow-scrolling:touch;
   }
@@ -869,6 +870,12 @@ input[type="checkbox"] { accent-color: var(--accent); }
   .preview-toolbar .preview-tool-icon svg { width:19px;height:19px; }
   .preview-toolbar .tool-label,.toolbar-sep,.preview-size-info { display:none; }
   .btn-fit { background:transparent;border:0; }
+  .preview-toolbar .frame-tools { gap:3px;padding:3px;flex:none;border-radius:11px; }
+  .preview-toolbar .frame-tool-btn,.preview-toolbar .frame-align-btn {
+    width:36px;height:36px;min-width:36px;min-height:36px;padding:0;display:inline-grid;place-items:center;flex:0 0 36px;
+  }
+  .preview-toolbar .frame-tools svg { width:18px;height:18px; }
+  .preview-toolbar .frame-tool-label { display:none; }
 
   .topbar { padding: 0 12px; }
   .topbar-actions { gap: 6px; }
@@ -1228,7 +1235,12 @@ input[type="checkbox"] { accent-color: var(--accent); }
   color: var(--text-2);
   font-size: 11px;
   background: transparent;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
 }
+.frame-tools svg { width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none; }
 .frame-tool-btn:hover,
 .frame-align-btn:hover { background: var(--bg-panel); color: var(--text-1); }
 .frame-tool-btn.active {

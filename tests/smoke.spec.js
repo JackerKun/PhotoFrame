@@ -92,6 +92,54 @@ test('mobile keeps tools visible and pans a tall zoomed canvas vertically', asyn
   await page.screenshot({ path: '/tmp/photoframe-mobile-vertical-pan.png', fullPage: true });
 });
 
+test('mobile frame tools stay compact and pinch zoom only affects the canvas', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile');
+  await page.locator('#file-input').setInputFiles({ name: 'pinch.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await page.locator('#btn-border-resize').click();
+  await expect(page.locator('#frame-tools')).toBeVisible();
+
+  const toolMetrics = await page.locator('#frame-tools').evaluate(tools => ({
+    labels: [...tools.querySelectorAll('.frame-tool-label')].map(label => getComputedStyle(label).display),
+    buttons: [...tools.querySelectorAll('button')].map(button => {
+      const bounds = button.getBoundingClientRect();
+      return { width: bounds.width, height: bounds.height };
+    }),
+  }));
+  expect(toolMetrics.labels.every(display => display === 'none')).toBeTruthy();
+  expect(toolMetrics.buttons.every(button => button.width <= 38 && button.height <= 38)).toBeTruthy();
+  await expect(page.locator('#preview-wrapper')).toHaveCSS('touch-action', 'none');
+
+  const canvas = page.locator('#canvas-preview');
+  const beforeBounds = await canvas.boundingBox();
+  const beforePageScale = await page.evaluate(() => window.visualViewport?.scale || 1);
+  const centerX = beforeBounds.x + beforeBounds.width / 2;
+  const centerY = beforeBounds.y + beforeBounds.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [
+      { x: centerX - 35, y: centerY, id: 11 },
+      { x: centerX + 35, y: centerY, id: 12 },
+    ],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      { x: centerX - 90, y: centerY, id: 11 },
+      { x: centerX + 90, y: centerY, id: 12 },
+    ],
+  });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(100);
+
+  const afterBounds = await canvas.boundingBox();
+  const afterPageScale = await page.evaluate(() => window.visualViewport?.scale || 1);
+  expect(afterBounds.width).toBeGreaterThan(beforeBounds.width * 1.5);
+  expect(afterPageScale).toBe(beforePageScale);
+  await expect(page.locator('#zoom-label')).not.toHaveText('适应');
+  await page.screenshot({ path: '/tmp/photoframe-mobile-pinch-tools.png', fullPage: true });
+});
+
 test('professional theme and style controls affect the canvas', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#theme-select').selectOption('darkroom');

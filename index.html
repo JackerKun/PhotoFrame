@@ -636,15 +636,33 @@
           <span class="tool-label">调整边框</span>
         </button>
         <div id="frame-tools" class="frame-tools" hidden>
-          <button id="btn-frame-grid" class="frame-tool-btn active" type="button" title="显示或隐藏三分网格">网格</button>
-          <button id="btn-frame-snap" class="frame-tool-btn active" type="button" title="拖动时吸附到边缘、中心和三分线">吸附</button>
+          <button id="btn-frame-grid" class="frame-tool-btn active" type="button" title="显示或隐藏三分网格" aria-label="三分网格">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+            <span class="frame-tool-label">网格</span>
+          </button>
+          <button id="btn-frame-snap" class="frame-tool-btn active" type="button" title="拖动时吸附到边缘、中心和三分线" aria-label="吸附">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v8a7 7 0 0 0 14 0V3h-4v8a3 3 0 0 1-6 0V3Z"/><path d="M5 7h4M15 7h4"/></svg>
+            <span class="frame-tool-label">吸附</span>
+          </button>
           <span class="frame-tool-sep"></span>
-          <button class="frame-align-btn" data-frame-align="left" type="button" title="照片左对齐">左</button>
-          <button class="frame-align-btn" data-frame-align="h-center" type="button" title="照片水平居中">水平居中</button>
-          <button class="frame-align-btn" data-frame-align="right" type="button" title="照片右对齐">右</button>
-          <button class="frame-align-btn" data-frame-align="top" type="button" title="照片顶部对齐">上</button>
-          <button class="frame-align-btn" data-frame-align="v-center" type="button" title="照片垂直居中">垂直居中</button>
-          <button class="frame-align-btn" data-frame-align="bottom" type="button" title="照片底部对齐">下</button>
+          <button class="frame-align-btn" data-frame-align="left" type="button" title="照片左对齐" aria-label="照片左对齐">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v18M8 7h12M8 12h8M8 17h10"/></svg><span class="frame-tool-label">左</span>
+          </button>
+          <button class="frame-align-btn" data-frame-align="h-center" type="button" title="照片水平居中" aria-label="照片水平居中">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M7 12h10M6 17h12"/></svg><span class="frame-tool-label">水平居中</span>
+          </button>
+          <button class="frame-align-btn" data-frame-align="right" type="button" title="照片右对齐" aria-label="照片右对齐">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 3v18M4 7h12M8 12h8M6 17h10"/></svg><span class="frame-tool-label">右</span>
+          </button>
+          <button class="frame-align-btn" data-frame-align="top" type="button" title="照片顶部对齐" aria-label="照片顶部对齐">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18M7 8v12M12 8v8M17 8v10"/></svg><span class="frame-tool-label">上</span>
+          </button>
+          <button class="frame-align-btn" data-frame-align="v-center" type="button" title="照片垂直居中" aria-label="照片垂直居中">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 5v14M12 7v10M17 6v12"/></svg><span class="frame-tool-label">垂直居中</span>
+          </button>
+          <button class="frame-align-btn" data-frame-align="bottom" type="button" title="照片底部对齐" aria-label="照片底部对齐">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M7 4v12M12 8v8M17 6v10"/></svg><span class="frame-tool-label">下</span>
+          </button>
         </div>
         <span class="preview-size-info" id="preview-size-info"></span>
       </div>
