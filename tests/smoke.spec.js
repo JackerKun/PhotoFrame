@@ -30,13 +30,22 @@ test('upload, preset search, edit history and export state', async ({ page }, te
 test('built-in and personal stickers render and remain editable', async ({ page }, testInfo) => {
   await page.locator('#file-input').setInputFiles({ name: 'sticker-photo.svg', mimeType: 'image/svg+xml', buffer: svg });
   await expect(page.locator('#canvas-preview')).toBeVisible();
+  if (testInfo.project.name === 'desktop') {
+    const uploadZone = await page.locator('#upload-zone').boundingBox();
+    expect(uploadZone.height).toBeLessThan(52);
+  }
   const before = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
 
   await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
   if (testInfo.project.name === 'mobile') await page.locator('#panel-left').evaluate(el => el.classList.add('mobile-open'));
   await expect(page.locator('.sticker-category-btn')).toHaveCount(7);
-  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(170);
+  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(220);
   await expect.poll(() => page.locator('.sticker-card img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length)).toBe(0);
+  const ratioMismatches = await page.evaluate(() => window.StickerLibrary.builtIns.filter(asset => {
+    const match = decodeURIComponent(asset.src).match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    return !match || Math.abs(asset.ratio - Number(match[1]) / Number(match[2])) > .01;
+  }).map(asset => asset.id));
+  expect(ratioMismatches).toEqual([]);
   await page.getByRole('button', { name: /120 胶片/ }).click();
   await expect(page.locator('#sticker-tags')).toBeVisible();
   await page.getByRole('button', { name: 'B&W', exact: true }).click();
@@ -46,10 +55,20 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await expect(page.locator('#sticker-inspector')).toBeVisible();
   await expect(page.locator('#sticker-transform-handle')).toBeVisible();
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(before);
+  const afterFilm = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
   await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
+  await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(afterFilm);
   const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
   expect(cameraHandle).not.toBeNull();
   expect(Math.abs(cameraHandle.width / cameraHandle.height - 1)).toBeLessThan(0.08);
+  await page.getByRole('button', { name: /135 相机/ }).click();
+  await page.screenshot({ path: `/tmp/photoframe-cameras-${testInfo.project.name}.png`, fullPage: true });
+  await page.getByRole('button', { name: /其他/ }).click();
+  await page.getByRole('button', { name: '旅行', exact: true }).click();
+  await page.locator('.sticker-card[data-sticker-id="travel-pin"]').evaluate(el => el.click());
+  const iconHandle = await page.locator('#sticker-transform-handle').boundingBox();
+  expect(iconHandle).not.toBeNull();
+  expect(Math.abs(iconHandle.width / iconHandle.height - 1)).toBeLessThan(0.08);
   const cards = await page.locator('.sticker-card').evaluateAll(items => items.slice(0, 6).map(item => { const r = item.getBoundingClientRect(); return { top:r.top, height:r.height }; }));
   expect(cards.every(card => card.height >= 110)).toBeTruthy();
   expect(cards[3].top).toBeGreaterThanOrEqual(cards[0].top + cards[0].height);

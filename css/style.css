@@ -203,7 +203,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .upload-zone {
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
-  padding: 14px;
+  padding: 7px 12px;
   cursor: pointer;
   transition: background var(--transition);
 }
@@ -214,18 +214,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .upload-prompt {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--text-2);
 }
-.upload-prompt svg { width: 24px; height: 24px; flex-shrink: 0; color: var(--text-3); }
-.upload-prompt p { font-size: 13px; line-height: 1.4; }
-.upload-hint { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.upload-prompt svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-3); }
+.upload-prompt p { font-size: 12px; line-height: 1.25; }
+.upload-hint { font-size: 10px; color: var(--text-3); margin-top: 1px; }
 
 /* ── 胶片条 ── */
 #filmstrip {
   display: flex;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 7px 10px;
   overflow-x: auto;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -237,8 +237,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .strip-item {
   position: relative;
   flex-shrink: 0;
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 2px solid transparent;
