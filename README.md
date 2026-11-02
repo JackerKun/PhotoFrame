@@ -23,6 +23,7 @@ PhotoFrame 是一款运行在浏览器中的纯前端照片排版工具。上传
   - 冲印尺寸（大六寸 / 七寸 / 八寸）
   - 特定胶卷风格（Kodak Gold 200 / Ultramax / NC500）
 - **自定义预设**：在任意内置预设基础上修改并命名保存，跨会话持久
+- 预设搜索、收藏、最近使用，并根据当前照片画幅推荐
 
 ### 边框编辑
 - 四边独立宽度调节（相对短边百分比，0–40%）
@@ -36,37 +37,51 @@ PhotoFrame 是一款运行在浏览器中的纯前端照片排版工具。上传
 - 主标题 + 副标题双行显示
 - 支持模板变量自动填充：`{location}` `{camera}` `{film}` `{date}` `{iso}` `{aperture}` `{shutter}` `{lens}`
 - 自动读取 EXIF：相机型号、镜头、光圈、快门、ISO、拍摄日期
-- 主/副标题独立字体选择（宋体 Noto Serif SC / EB Garamond / Georgia / 系统字体）
+- 主/副标题独立字体选择（系统宋体 / Georgia / 系统字体）
 - 字号、字色、对齐方式（左 / 居中 / 右）自由调节
 - 额外文字行：支持添加多行自定义文字
 - 文字位置拖拽：点击「文字位置」按钮，直接拖拽定位文字块
 
 ### 照片处理
-- 拖拽或点击上传，支持 JPEG / PNG / TIFF / HEIC，最多 100 张
+- 拖拽或点击上传，支持 JPEG / PNG / TIFF / HEIC（全部在本机解码），最多 50 张
 - 画幅裁切编辑：拖拽平移、滚轮缩放、方向键微调
 - 多张照片胶片条管理，支持 Ctrl/Cmd 多选
+- 撤销/重做、按住对比原图、一键将当前样式应用到已选或全部照片
 
 ### 批量导出
 - 全部照片一键打包为 ZIP 下载
 - 每张照片可单独绑定不同预设
 - 导出格式：JPEG（可调质量 70–100%）/ PNG
 - 输出长边：1500 / 2400 / 3000 / 4500 / 6000px 或原始尺寸
+- 可自定义文件名模板，批量导出会汇总失败项
+- 导出时统一为 sRGB 并默认移除 EXIF/GPS 信息
 
 ### 会话恢复
-- 关闭页面后重新打开，自动恢复上次照片与参数
+- 关闭页面后重新打开，可选自动恢复上次照片与参数，并显示本机存储占用
+- 所有依赖均已本地化，首次打开后由 Service Worker 提供离线访问
 
 ---
 
 ## 快速开始
 
-无需构建工具，直接用本地 HTTP 服务器启动：
+首次开发需安装并同步本地依赖；正常使用时不需构建：
 
 ```bash
+npm install
+npm run vendor
+
 # Python 3
 python3 -m http.server 8080
 ```
 
 然后打开浏览器访问 `http://localhost:8080`。
+
+运行质量检查：
+
+```bash
+npm run check
+npm test
+```
 
 ---
 
@@ -99,10 +114,12 @@ photoframe/
 |------|------|
 | 框架 | 原生 JavaScript，无构建工具 |
 | 渲染 | HTML5 Canvas API |
-| EXIF | exifr 7（CDN） |
-| 批量导出 | JSZip + FileSaver.js（CDN） |
-| 字体 | Noto Serif SC + EB Garamond（Google Fonts） |
+| EXIF | exifr 7（本地依赖） |
+| HEIC / TIFF | heic2any + UTIF（本地解码） |
+| 批量导出 | JSZip + FileSaver.js（本地依赖） |
+| 字体 | macOS / Windows 系统字体 + Georgia |
 | 存储 | localStorage（自定义预设） + IndexedDB（会话文件） |
+| 测试 | Playwright（桌面端 + 移动端） |
 
 ---
 

@@ -169,5 +169,11 @@ window.SessionStore = (() => {
     ]);
   }
 
-  return { open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll };
+  async function estimate() {
+    if (!navigator.storage?.estimate) return null;
+    const { usage = 0, quota = 0 } = await navigator.storage.estimate();
+    return { usage, quota };
+  }
+
+  return { open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll, estimate };
 })();

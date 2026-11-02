@@ -5,6 +5,37 @@ window.Storage = (() => {
   const KEY_PRESETS  = 'pf_custom_presets';
   const KEY_NAMES    = 'pf_preset_names';    // { id: displayName }
   const KEY_HIDDEN   = 'pf_hidden_presets';  // [ id, ... ]
+  const KEY_FAVORITES = 'pf_favorite_presets';
+  const KEY_RECENT = 'pf_recent_presets';
+  const KEY_SETTINGS = 'pf_settings';
+
+  function readArray(key) {
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+    catch { return []; }
+  }
+
+  function getFavoriteIds() { return readArray(KEY_FAVORITES); }
+  function isFavorite(id) { return getFavoriteIds().includes(id); }
+  function toggleFavorite(id) {
+    const ids = getFavoriteIds();
+    const next = ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id];
+    localStorage.setItem(KEY_FAVORITES, JSON.stringify(next));
+    return next.includes(id);
+  }
+
+  function getRecentIds() { return readArray(KEY_RECENT); }
+  function recordRecent(id) {
+    const next = [id, ...getRecentIds().filter(item => item !== id)].slice(0, 12);
+    localStorage.setItem(KEY_RECENT, JSON.stringify(next));
+  }
+
+  function getSettings() {
+    try { return JSON.parse(localStorage.getItem(KEY_SETTINGS) || '{}'); }
+    catch { return {}; }
+  }
+  function setSetting(key, value) {
+    localStorage.setItem(KEY_SETTINGS, JSON.stringify({ ...getSettings(), [key]: value }));
+  }
 
   // ── 自定义预设 ────────────────────────────────────────────────────────────
   function getCustomPresets() {
@@ -74,6 +105,8 @@ window.Storage = (() => {
     getCustomPresets, saveCustomPreset, deleteCustomPreset,
     getNameOverrides, setNameOverride, getDisplayName,
     getHiddenIds, hidePreset, unhidePreset,
+    getFavoriteIds, isFavorite, toggleFavorite, getRecentIds, recordRecent,
+    getSettings, setSetting,
     allPresets,
   };
 })();

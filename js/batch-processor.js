@@ -19,8 +19,10 @@ window.BatchProcessor = (() => {
     const folder = zip.folder('PhotoFrame导出');
     const total  = jobs.length;
     let done = 0;
+    const failed = [];
+    const usedNames = new Set();
 
-    for (const job of jobs) {
+    for (const [index, job] of jobs.entries()) {
       try {
         // getPreset 接收完整 job，返回合并后的 preset
         const preset = getPreset(job);
@@ -31,7 +33,7 @@ window.BatchProcessor = (() => {
           job.file,
           preset,
           job,
-          out.longEdge || 3000
+          out.longEdge ?? 3000
         );
         const blob = await CanvasRenderer.canvasToBlob(
           canvas,
@@ -40,10 +42,13 @@ window.BatchProcessor = (() => {
         );
 
         const ext  = (out.format || 'jpeg') === 'png' ? 'png' : 'jpg';
-        const name = sanitizeFilename(job.file.name, ext);
+        let name = resolveFilename(out.filenameTemplate, job, index + 1, ext);
+        if (usedNames.has(name)) name = resolveFilename('{name}_frame_{index}', job, index + 1, ext);
+        usedNames.add(name);
         folder.file(name, blob);
       } catch (e) {
         console.error('[BatchProcessor] job 失败:', e);
+        failed.push({ job, error: e });
       }
 
       done++;
@@ -53,11 +58,18 @@ window.BatchProcessor = (() => {
     const content = await zip.generateAsync({ type: 'blob' });
     const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     saveAs(content, `PhotoFrame_${ts}.zip`);
+    return { success: total - failed.length, failed };
   }
 
-  function sanitizeFilename(originalName, ext) {
-    const base = originalName.replace(/\.[^.]+$/, '').replace(/[^\w\u4e00-\u9fff\-_.]/g, '_');
-    return `${base}_frame.${ext}`;
+  function resolveFilename(template, job, index, ext) {
+    const base = job.file.name.replace(/\.[^.]+$/, '');
+    const date = job.overrides?.date || job.exif?.date || new Date().toISOString().slice(0, 10);
+    const camera = job.overrides?.camera || job.exif?.camera || '';
+    const resolved = (template || '{name}_frame_{index}')
+      .replace(/\{name\}/g, base).replace(/\{date\}/g, date)
+      .replace(/\{camera\}/g, camera).replace(/\{index\}/g, String(index).padStart(2, '0'))
+      .replace(/[^\w\u4e00-\u9fff\-_.]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    return `${resolved || 'PhotoFrame'}.${ext}`;
   }
 
   /**
@@ -69,7 +81,7 @@ window.BatchProcessor = (() => {
       job.file,
       preset,
       job,
-      out.longEdge || 3000
+      out.longEdge ?? 3000
     );
     const blob = await CanvasRenderer.canvasToBlob(
       canvas,
@@ -77,9 +89,9 @@ window.BatchProcessor = (() => {
       (out.quality || 95) / 100
     );
     const ext  = (out.format || 'jpeg') === 'png' ? 'png' : 'jpg';
-    const name = sanitizeFilename(job.file.name, ext);
+    const name = resolveFilename(out.filenameTemplate, job, 1, ext);
     saveAs(blob, name);
   }
 
-  return { exportZip, exportSingle };
+  return { exportZip, exportSingle, resolveFilename };
 })();

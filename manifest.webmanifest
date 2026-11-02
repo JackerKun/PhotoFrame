@@ -1,0 +1,10 @@
+{
+  "name": "PhotoFrame",
+  "short_name": "PhotoFrame",
+  "description": "隐私友好的本地照片加边框与拼图工具",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f4f0",
+  "theme_color": "#f5f4f0",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

@@ -34,6 +34,11 @@
     borderResizeMode: false,   // 边框拖拽调整模式
     frameGridEnabled: true,    // 边框编辑三分网格
     frameSnapEnabled: true,    // 边缘/中心/三分线吸附
+    presetQuery: '',
+    exportFilenameTemplate: '{name}_frame_{index}',
+    persistOriginals: true,
+    undoStack: [],
+    redoStack: [],
   };
 
   let _textDragState = null; // { startX, startY, startOffsetX, startOffsetY }
@@ -47,6 +52,7 @@
   let _borderOverlaySyncRaf = null;
   let sessionSaveDebounce = null;
   let cropEditorInstance = null;
+  let cropHistorySnapshot = null;
   let collagePreviewDebounce = null;
 
   // 图片元素缓存（避免重复解码大图）
@@ -54,13 +60,7 @@
 
   async function getJobImage(job) {
     if (imageCache.has(job.file)) return imageCache.get(job.file);
-    const img = await new Promise((resolve, reject) => {
-      const im = new Image();
-      const url = URL.createObjectURL(job.file);
-      im.onload  = () => { URL.revokeObjectURL(url); resolve(im); };
-      im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
-      im.src = url;
-    });
+    const img = await window.ImageDecoder.load(job.file);
     imageCache.set(job.file, img);
     return img;
   }
@@ -106,6 +106,7 @@
   // 初始化
   // ══════════════════════════════════════════════════════════════════════════
   function init() {
+    state.persistOriginals = Storage.getSettings().persistOriginals !== false;
     state.presets = Storage.allPresets();
     renderPresetGrid();
     setupUpload();
@@ -121,6 +122,8 @@
     setupTextPosMode();    // 文字位置拖拽
     setupBorderResizeMode(); // 边框拖拽调整
     setupClearSession();   // 清空会话按钮
+    setupProductivityControls();
+    setupAccessibility();
     updateEmptyState();
     initSession();         // 恢复上次会话（异步，不阻塞 UI）
   }
@@ -151,10 +154,10 @@
   }
 
   async function handleFiles(files) {
-    const imageFiles = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif|tiff?|raw|arw|cr2|nef|dng)$/i.test(f.name));
+    const imageFiles = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif|tiff?)$/i.test(f.name));
     if (!imageFiles.length) { showToast('未检测到图片文件', 'warn'); return; }
 
-    const MAX = 100;
+    const MAX = 50;
     if (state.jobs.length + imageFiles.length > MAX) {
       showToast(`最多支持 ${MAX} 张，已截取前 ${MAX - state.jobs.length} 张`, 'warn');
       imageFiles.splice(MAX - state.jobs.length);
@@ -175,7 +178,11 @@
       state.jobs.push(job);
 
       // 持久化：先保存文件二进制
-      SessionStore.saveFile(job.id, file).catch(e => console.warn('文件保存失败', e));
+      if (state.persistOriginals) {
+        SessionStore.saveFile(job.id, file)
+          .then(updateStorageUsage)
+          .catch(e => showToast(`原图本机保存失败：${e.message}`, 'warn'));
+      }
 
       // 异步读 EXIF，读完后刷新界面并保存元数据
       ExifReader.read(file).then(exif => {
@@ -198,11 +205,10 @@
     showToast(`已添加 ${imageFiles.length} 张照片`);
   }
 
-  function createThumb(job, onDone) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
+  async function createThumb(job, onDone) {
+    try {
+      const img = await getJobImage(job);
+      job.sourceRatio = img.naturalWidth / img.naturalHeight;
         const size = 120;
         const canvas = document.createElement('canvas');
         const scale = size / Math.max(img.width, img.height);
@@ -212,10 +218,10 @@
         job.thumbUrl = canvas.toDataURL('image/jpeg', 0.8);
         updateFilmstrip();
         if (onDone) onDone();
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(job.file);
+    } catch (e) {
+      job.status = 'error';
+      showToast(`${job.file.name} 无法解码：${e.message}`, 'error');
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -321,6 +327,7 @@
     } else {
       clearPreview();
     }
+    updateStorageUsage();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -335,7 +342,14 @@
     const container = document.getElementById('category-filter');
     if (!container) return;
     container.innerHTML = '';
-    window.PRESET_CATEGORIES.forEach(cat => {
+    const categories = [
+      { id: 'all', label: '全部' },
+      { id: 'recommended', label: '适合当前' },
+      { id: 'favorites', label: '收藏' },
+      { id: 'recent', label: '最近使用' },
+      ...window.PRESET_CATEGORIES.filter(cat => cat.id !== 'all'),
+    ];
+    categories.forEach(cat => {
       const btn = document.createElement('button');
       btn.className = 'cat-btn' + (cat.id === state.activeCategory ? ' active' : '');
       btn.textContent = cat.label;
@@ -362,12 +376,28 @@
     } else {
       list = state.presets;
       if (state.activeCategory !== 'all') {
-        if (state.activeCategory === 'custom') {
+        if (state.activeCategory === 'favorites') {
+          list = list.filter(p => Storage.isFavorite(p.id));
+        } else if (state.activeCategory === 'recent') {
+          const order = Storage.getRecentIds();
+          list = list.filter(p => order.includes(p.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        } else if (state.activeCategory === 'recommended') {
+          const ratio = activeJob()?.sourceRatio;
+          list = ratio ? list.filter(p => Math.abs((p.thumb?.photoRatio || 1) - ratio) / ratio < 0.23) : list.slice(0, 8);
+        } else if (state.activeCategory === 'custom') {
           list = list.filter(p => p.isCustom);
         } else {
           list = list.filter(p => p.category === state.activeCategory);
         }
       }
+    }
+
+    const query = state.presetQuery.trim().toLowerCase();
+    if (query) {
+      list = list.filter(p => {
+        const ratio = formatRatio(p.thumb?.photoRatio || 1);
+        return `${Storage.getDisplayName(p)} ${p.category || ''} ${ratio}`.toLowerCase().includes(query);
+      });
     }
 
     list.forEach(preset => {
@@ -385,6 +415,9 @@
     const isCollage = preset.isCollage;
     card.className = 'preset-card' + (preset.id === state.activePresetId ? ' active' : '');
     card.dataset.id = preset.id;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `使用预设 ${Storage.getDisplayName(preset)}`);
 
     // SVG 缩略图
     const svg = isCollage ? buildCollageSVG(preset) : buildPresetSVG(preset);
@@ -400,6 +433,34 @@
       startRename(preset, nameEl);
     });
     card.appendChild(nameEl);
+
+    const meta = document.createElement('div');
+    meta.className = 'preset-meta';
+    const ratio = document.createElement('span');
+    ratio.className = 'preset-ratio';
+    ratio.textContent = isCollage ? `${preset.cells?.length || 0} 格` : formatRatio(preset.thumb?.photoRatio || 1);
+    meta.appendChild(ratio);
+    const sourceRatio = activeJob()?.sourceRatio;
+    if (!isCollage && sourceRatio && Math.abs((preset.thumb?.photoRatio || 1) - sourceRatio) / sourceRatio < 0.12) {
+      const recommended = document.createElement('span');
+      recommended.className = 'preset-recommended';
+      recommended.textContent = '匹配';
+      meta.appendChild(recommended);
+    }
+    card.appendChild(meta);
+
+    const favorite = document.createElement('button');
+    favorite.type = 'button';
+    favorite.className = 'preset-favorite-btn' + (Storage.isFavorite(preset.id) ? ' active' : '');
+    favorite.textContent = Storage.isFavorite(preset.id) ? '★' : '☆';
+    favorite.title = Storage.isFavorite(preset.id) ? '取消收藏' : '收藏';
+    favorite.setAttribute('aria-label', favorite.title);
+    favorite.addEventListener('click', e => {
+      e.stopPropagation();
+      Storage.toggleFavorite(preset.id);
+      filterAndRenderCards();
+    });
+    card.appendChild(favorite);
 
     if (preset.isCustom) {
       const tag = document.createElement('span');
@@ -420,6 +481,9 @@
     card.appendChild(menuBtn);
 
     card.addEventListener('click', () => selectPreset(preset.id));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPreset(preset.id); }
+    });
     return card;
   }
 
@@ -656,6 +720,8 @@
   }
 
   function selectPreset(id) {
+    if (id !== state.activePresetId) recordHistory('选择预设');
+    Storage.recordRecent(id);
     // 拼图预设 → 进入拼图编辑器
     const collageLayout = window.COLLAGE_LAYOUTS?.find(l => l.id === id);
     if (collageLayout) {
@@ -1157,7 +1223,7 @@
     const bc = document.getElementById('border-color');
     if (bc) bc.value = b.color || '#FFFFFF';
 
-    setVal('font-title',       info.titleFont       || 'Noto Serif SC');
+    setVal('font-title',       info.titleFont       || 'Songti SC');
     setVal('font-subtitle',    info.subtitleFont    || 'system-ui');
     setVal('font-title-size',  info.titleFontSize   || 0.038);
     setVal('font-sub-size',    info.subtitleFontSize|| 0.026);
@@ -1298,12 +1364,13 @@
     const qLabel = document.getElementById('quality-label');
     const res = document.getElementById('output-resolution');
 
-    if (fmt) fmt.addEventListener('change', () => { state.exportFormat = fmt.value; });
+    if (fmt) fmt.addEventListener('change', () => { state.exportFormat = fmt.value; schedulePreview(); });
     if (qty) qty.addEventListener('input', () => {
       state.exportQuality = parseInt(qty.value, 10);
       if (qLabel) qLabel.textContent = qty.value + '%';
+      schedulePreview();
     });
-    if (res) res.addEventListener('change', () => { state.exportLongEdge = parseInt(res.value, 10) || 3000; });
+    if (res) res.addEventListener('change', () => { state.exportLongEdge = Number.parseInt(res.value, 10); schedulePreview(); });
 
     // 导出按钮
     const btnSingle = document.getElementById('btn-export-single');
@@ -1359,7 +1426,7 @@
     if (progress) { progress.hidden = false; }
 
     try {
-      await BatchProcessor.exportZip(
+      const result = await BatchProcessor.exportZip(
         state.jobs,
         job => {
           const pid = job?.presetId || state.activePresetId;
@@ -1371,7 +1438,7 @@
           if (btn) btn.textContent = `处理中 ${done}/${total}…`;
         }
       );
-      showToast(`${state.jobs.length} 张照片已打包下载`);
+      showToast(result.failed.length ? `已导出 ${result.success} 张，${result.failed.length} 张失败` : `${result.success} 张照片已打包下载`, result.failed.length ? 'warn' : 'info');
     } catch (e) {
       showToast('批量导出失败: ' + e.message, 'error');
     } finally {
@@ -1400,7 +1467,8 @@
       output: {
         format:   state.exportFormat   || preset.output?.format   || 'jpeg',
         quality:  state.exportQuality  || preset.output?.quality  || 95,
-        longEdge: state.exportLongEdge || preset.output?.longEdge || 3000,
+        longEdge: state.exportLongEdge ?? preset.output?.longEdge ?? 3000,
+        filenameTemplate: state.exportFilenameTemplate,
       },
     };
   }
@@ -1520,6 +1588,16 @@
   function updateSizeInfo(canvas) {
     const el = document.getElementById('preview-size-info');
     if (el) el.textContent = `预览 ${canvas.width} × ${canvas.height}px`;
+    const summary = document.getElementById('output-summary');
+    const layout = CanvasRenderer.getLastLayout();
+    if (summary && layout) {
+      const longEdge = state.exportLongEdge || Math.max(layout.canvasW, layout.canvasH);
+      const scale = longEdge / Math.max(layout.canvasW, layout.canvasH);
+      const width = Math.round(layout.canvasW * scale);
+      const height = Math.round(layout.canvasH * scale);
+      const sizeLabel = state.exportLongEdge === 0 ? '原始尺寸' : `${width} × ${height}px`;
+      summary.innerHTML = `<strong>${sizeLabel}</strong><span>${state.exportFormat.toUpperCase()} · 质量 ${state.exportQuality}% · ${state.jobs.length} 张</span>`;
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1655,6 +1733,12 @@
   // 移动端导航
   // ══════════════════════════════════════════════════════════════════════════
   function setupMobileNav() {
+    const backdrop = document.getElementById('mobile-panel-backdrop');
+    const closePanel = () => {
+      document.getElementById('panel-left')?.classList.remove('mobile-open');
+      if (backdrop) backdrop.hidden = true;
+    };
+    backdrop?.addEventListener('click', closePanel);
     document.querySelectorAll('.mobile-nav-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         const panel = btn.dataset.panel;
@@ -1670,8 +1754,10 @@
         // 移动端：显示/隐藏左侧面板
         const panelEl = document.getElementById('panel-left');
         panelEl?.classList.toggle('mobile-open', true);
+        if (backdrop) backdrop.hidden = false;
       });
     });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1685,9 +1771,183 @@
     if (previewArea) previewArea.hidden = !hasJobs;
     const btnBatch = document.getElementById('btn-export-batch');
     if (btnBatch) btnBatch.textContent = `批量导出 (${state.jobs.length}张)`;
+    ['btn-export-single', 'btn-export-single2', 'btn-export-batch', 'btn-export-batch2', 'btn-compare']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !hasJobs; });
     const btnClear = document.getElementById('btn-clear-session');
     if (btnClear) btnClear.hidden = !hasJobs;
     updateCropButton();
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 效率、历史与产品化控件
+  // ═════════════════════════════════════════════════════════════════════════
+  function historySnapshot() {
+    return {
+      activePresetId: state.activePresetId,
+      activeJobId: state.activeJobId,
+      jobs: state.jobs.map(j => ({
+        id: j.id, presetId: j.presetId,
+        overrides: structuredClone(j.overrides || {}),
+        borderOverrides: structuredClone(j.borderOverrides || {}),
+        infoOverrides: structuredClone(j.infoOverrides || {}),
+        cropRect: structuredClone(j.cropRect || null),
+        frameLayout: structuredClone(j.frameLayout || null),
+      })),
+    };
+  }
+
+  function pushHistorySnapshot(snapshot, label) {
+    state.undoStack.push({ snapshot, label });
+    if (state.undoStack.length > 40) state.undoStack.shift();
+    state.redoStack = [];
+    updateHistoryButtons();
+  }
+
+  function recordHistory(label) { pushHistorySnapshot(historySnapshot(), label); }
+
+  function restoreHistory(snapshot) {
+    state.activePresetId = snapshot.activePresetId;
+    state.activeJobId = snapshot.activeJobId;
+    snapshot.jobs.forEach(saved => {
+      const job = state.jobs.find(j => j.id === saved.id);
+      if (job) Object.assign(job, structuredClone(saved));
+    });
+    renderPresetGrid();
+    updateFilmstrip();
+    const job = activeJob();
+    if (job) { fillInfoForm(job); fillBorderForm(activePreset(), job); }
+    syncExportControlsFromPreset(activePreset());
+    schedulePreview();
+  }
+
+  function undo() {
+    const entry = state.undoStack.pop();
+    if (!entry) return;
+    state.redoStack.push({ snapshot: historySnapshot(), label: entry.label });
+    restoreHistory(entry.snapshot);
+    updateHistoryButtons();
+    showToast(`已撤销：${entry.label}`);
+  }
+
+  function redo() {
+    const entry = state.redoStack.pop();
+    if (!entry) return;
+    state.undoStack.push({ snapshot: historySnapshot(), label: entry.label });
+    restoreHistory(entry.snapshot);
+    updateHistoryButtons();
+    showToast(`已重做：${entry.label}`);
+  }
+
+  function updateHistoryButtons() {
+    const undoBtn = document.getElementById('btn-undo');
+    const redoBtn = document.getElementById('btn-redo');
+    if (undoBtn) undoBtn.disabled = !state.undoStack.length;
+    if (redoBtn) redoBtn.disabled = !state.redoStack.length;
+  }
+
+  function copyStyleTo(targets) {
+    const source = activeJob();
+    if (!source) return;
+    recordHistory('批量应用样式');
+    targets.forEach(job => {
+      if (job.id === source.id) return;
+      job.presetId = source.presetId;
+      job.borderOverrides = structuredClone(source.borderOverrides || {});
+      job.infoOverrides = structuredClone(source.infoOverrides || {});
+      job.frameLayout = structuredClone(source.frameLayout || null);
+    });
+    scheduleSessionSave();
+    showToast(`已应用到 ${targets.length} 张照片`);
+  }
+
+  async function showOriginal() {
+    const job = activeJob();
+    const el = document.getElementById('original-preview');
+    if (!job || !el) return;
+    const blob = await window.ImageDecoder.toRenderableBlob(job.file);
+    if (el.dataset.url) URL.revokeObjectURL(el.dataset.url);
+    el.dataset.url = URL.createObjectURL(blob);
+    el.src = el.dataset.url;
+    el.hidden = false;
+  }
+  function hideOriginal() {
+    const el = document.getElementById('original-preview');
+    if (el) el.hidden = true;
+  }
+
+  function setupProductivityControls() {
+    const search = document.getElementById('preset-search');
+    search?.addEventListener('input', () => { state.presetQuery = search.value; filterAndRenderCards(); });
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+      else if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement?.tagName || '')) { e.preventDefault(); search?.focus(); }
+    });
+    document.getElementById('btn-undo')?.addEventListener('click', undo);
+    document.getElementById('btn-redo')?.addEventListener('click', redo);
+
+    const compare = document.getElementById('btn-compare');
+    ['pointerdown', 'touchstart'].forEach(type => compare?.addEventListener(type, e => { e.preventDefault(); showOriginal(); }));
+    ['pointerup', 'pointerleave', 'pointercancel', 'touchend'].forEach(type => compare?.addEventListener(type, hideOriginal));
+
+    document.getElementById('btn-reset-style')?.addEventListener('click', () => {
+      const job = activeJob(); const preset = activePreset();
+      if (!job || !preset) return;
+      recordHistory('恢复预设');
+      job.borderOverrides = { ...preset.border };
+      job.infoOverrides = { ...preset.infoBar };
+      job.frameLayout = null;
+      fillBorderForm(preset, job); schedulePreview();
+    });
+    document.getElementById('btn-apply-selected')?.addEventListener('click', () => {
+      const targets = state.jobs.filter(j => state.selectedJobIds.has(j.id));
+      if (targets.length < 2) return showToast('请先在底部胶片条多选照片', 'warn');
+      copyStyleTo(targets);
+    });
+    document.getElementById('btn-apply-all')?.addEventListener('click', () => copyStyleTo(state.jobs));
+
+    const filename = document.getElementById('output-filename');
+    filename?.addEventListener('input', () => { state.exportFilenameTemplate = filename.value.trim() || '{name}_frame_{index}'; });
+    const persist = document.getElementById('persist-originals');
+    if (persist) {
+      persist.checked = state.persistOriginals;
+      persist.addEventListener('change', () => {
+        state.persistOriginals = persist.checked;
+        Storage.setSetting('persistOriginals', persist.checked);
+        showToast(persist.checked ? '后续上传的原图将保存在本机' : '后续上传的原图仅供本次使用');
+      });
+    }
+    updateStorageUsage();
+
+    let beforeEdit = null;
+    const panel = document.getElementById('panel-left');
+    panel?.addEventListener('focusin', e => { if (/input|select|textarea/i.test(e.target.tagName)) beforeEdit = historySnapshot(); }, true);
+    panel?.addEventListener('change', e => {
+      if (beforeEdit && /input|select|textarea/i.test(e.target.tagName)) pushHistorySnapshot(beforeEdit, '调整参数');
+      beforeEdit = null;
+    }, true);
+  }
+
+  async function updateStorageUsage() {
+    const el = document.getElementById('storage-usage');
+    if (!el) return;
+    try {
+      const estimate = await SessionStore.estimate();
+      if (!estimate) { el.textContent = '浏览器未提供'; return; }
+      const mb = n => `${(n / 1024 / 1024).toFixed(n > 1024 * 1024 * 100 ? 0 : 1)} MB`;
+      el.textContent = `${mb(estimate.usage)} / ${mb(estimate.quota)}`;
+    } catch { el.textContent = '无法读取'; }
+  }
+
+  function setupAccessibility() {
+    document.querySelectorAll('.panel-tab').forEach(btn => {
+      const sync = () => btn.setAttribute('aria-selected', String(btn.classList.contains('active')));
+      sync(); btn.addEventListener('click', () => document.querySelectorAll('.panel-tab').forEach(b => b.setAttribute('aria-selected', String(b.classList.contains('active')))));
+    });
+    document.querySelectorAll('.form-group > label:not([for])').forEach(label => {
+      const control = label.parentElement.querySelector('input,select,textarea');
+      if (control?.id) label.htmlFor = control.id;
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1778,6 +2038,7 @@
       cropCanvas.style.height = rect.height + 'px';
 
       cropEditorInstance = new CropEditor(cropCanvas, img, targetRatio, dpr);
+      cropHistorySnapshot = historySnapshot();
 
       // 初始化锁定比例按钮状态
       const btnLockRatio = document.getElementById('btn-crop-lock-ratio');
@@ -1816,7 +2077,9 @@
     if (apply && cropEditorInstance) {
       const job = activeJob();
       if (job) { job.cropRect = cropEditorInstance.getCropData(); }
+      if (cropHistorySnapshot) pushHistorySnapshot(cropHistorySnapshot, '调整构图');
     }
+    cropHistorySnapshot = null;
     if (cropEditorInstance) { cropEditorInstance.destroy(); cropEditorInstance = null; }
     const overlay = document.getElementById('crop-overlay');
     if (overlay) overlay.hidden = true;
@@ -2258,7 +2521,7 @@
       opts.className = 'extra-line-opts';
 
       const fontSel = document.createElement('select');
-      [['', '继承副标题字体'], ['Noto Serif SC', '宋体'], ['EB Garamond', 'EB Garamond'],
+      [['', '继承副标题字体'], ['Songti SC', '宋体'], ['Georgia', 'Georgia'],
        ['system-ui', '系统无衬线'], ['monospace', '等宽']].forEach(([v, l]) => {
         const o = document.createElement('option');
         o.value = v; o.textContent = l;
@@ -2520,11 +2783,13 @@
 
     const onBorderDragEnd = (e) => {
       if (!_borderDragState) return;
+      const before = _borderDragState.historySnapshot;
       if (_rafPreview) { cancelAnimationFrame(_rafPreview); _rafPreview = null; }
       if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       _borderDragState = null;
       document.body.classList.remove('border-frame-dragging');
       document.getElementById('frame-photo-mover')?.classList.remove('dragging');
+      if (before) pushHistorySnapshot(before, '调整边框');
       renderPreview();
     };
 
@@ -2557,6 +2822,7 @@
         initialScaleY: startRect.height / frame.canvasH,
         snapX: null,
         snapY: null,
+        historySnapshot: historySnapshot(),
       };
       document.body.classList.add('border-frame-dragging');
       if (type === 'move') target.classList.add('dragging');
@@ -2917,6 +3183,7 @@
           startY: e.clientY,
           startOffsetX: info.textOffsetX || 0,
           startOffsetY: info.textOffsetY || 0,
+          historySnapshot: historySnapshot(),
         };
       });
 
@@ -2955,7 +3222,9 @@
       });
 
       handle.addEventListener('pointerup', () => {
+        const before = _textDragState?.historySnapshot;
         _textDragState = null;
+        if (before) pushHistorySnapshot(before, '调整文字位置');
         handle.classList.remove('dragging');
         updateTextPosHandle();
       });
@@ -3129,6 +3398,7 @@
       updateFilmstrip();
       updateEmptyState();
       showToast('已清空所有照片', 'info');
+      updateStorageUsage();
     });
   }
 
@@ -3136,5 +3406,8 @@
   // 启动
   // ══════════════════════════════════════════════════════════════════════════
   document.addEventListener('DOMContentLoaded', init);
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('离线缓存注册失败', e));
+  }
 
 })();

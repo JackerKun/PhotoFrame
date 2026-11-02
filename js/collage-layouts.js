@@ -19,7 +19,7 @@ function _grid(cols, rows, gx = 0.004, gy = 0.004) {
 
 const _bar = {
   enabled: true, titleTemplate: '', subtitleTemplate: '',
-  titleFont: 'Noto Serif SC', subtitleFont: 'system-ui',
+  titleFont: 'Songti SC', subtitleFont: 'system-ui',
   titleFontSize: 0.038, subtitleFontSize: 0.026,
   fontColor: '#1A1A1A', textAlign: 'center',
 };
@@ -336,13 +336,7 @@ window.COLLAGE_LAYOUTS.forEach(l => {
 window.CollageRenderer = (() => {
 
   function loadImage(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(); };
-      img.src = url;
-    });
+    return window.ImageDecoder.load(file);
   }
 
   function autoCrop(imgW, imgH, targetRatio) {

@@ -22,13 +22,7 @@ window.CanvasRenderer = (() => {
       imageCache.set(file, cached);
       return cached;
     }
-    const pending = new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
-      img.src = url;
-    });
+    const pending = window.ImageDecoder.load(file);
     imageCache.set(file, pending);
     while (imageCache.size > MAX_DECODED_IMAGES) {
       imageCache.delete(imageCache.keys().next().value);
@@ -371,7 +365,7 @@ window.CanvasRenderer = (() => {
     const canvas = document.createElement('canvas');
     canvas.width  = canvasW;
     canvas.height = canvasH;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
