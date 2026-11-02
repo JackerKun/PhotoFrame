@@ -2417,6 +2417,7 @@
 
       overlay.hidden = false;
       state.cropMode = true;
+      updateStickerTransformHandle();
 
       const cropCanvas = document.getElementById('crop-canvas');
       const inner      = document.getElementById('crop-overlay-inner');
@@ -2457,6 +2458,7 @@
       showToast('进入裁切模式失败: ' + e.message, 'error');
       overlay.hidden = true;
       state.cropMode = false;
+      updateStickerTransformHandle();
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -2478,6 +2480,7 @@
     const overlay = document.getElementById('crop-overlay');
     if (overlay) overlay.hidden = true;
     state.cropMode = false;
+    updateStickerTransformHandle();
     updateCropButton();
     if (apply) schedulePreview();
   }
@@ -2832,6 +2835,7 @@
     cropOverlay.hidden = false;
     state.slotCropMode  = true;
     state.slotCropIndex = slotIndex;
+    updateStickerTransformHandle();
 
     const cropCanvas = document.getElementById('crop-canvas');
     const inner      = document.getElementById('crop-overlay-inner');
@@ -2878,6 +2882,7 @@
 
     state.slotCropMode  = false;
     state.slotCropIndex = -1;
+    updateStickerTransformHandle();
 
     updateSlotList();
     if (apply) scheduleCollagePreview();
@@ -3149,7 +3154,8 @@
   }
 
   function scheduleBorderOverlaySync() {
-    const stickerActive = state.activeTab === 'stickers' && !!selectedSticker();
+    const stickerActive = state.activeTab === 'stickers' && !!selectedSticker() &&
+      !state.cropMode && !state.slotCropMode && !state.borderResizeMode && !state.textPosMode;
     if ((!state.borderResizeMode && !state.textPosMode && !stickerActive) || _borderDragState || _borderOverlaySyncRaf) return;
     _borderOverlaySyncRaf = requestAnimationFrame(() => {
       _borderOverlaySyncRaf = null;
@@ -3465,6 +3471,7 @@
   function enterBorderResizeMode() {
     if (state.textPosMode) exitTextPosMode();
     state.borderResizeMode = true;
+    updateStickerTransformHandle();
     document.getElementById('btn-border-resize')?.classList.add('active');
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = false;
@@ -3483,6 +3490,7 @@
 
   function exitBorderResizeMode() {
     state.borderResizeMode = false;
+    updateStickerTransformHandle();
     document.getElementById('btn-border-resize')?.classList.remove('active');
     const overlay = document.getElementById('border-resize-overlay');
     if (overlay) overlay.hidden = true;
@@ -3770,12 +3778,14 @@
   function enterTextPosMode() {
     if (state.borderResizeMode) exitBorderResizeMode();
     state.textPosMode = true;
+    updateStickerTransformHandle();
     document.getElementById('btn-text-pos')?.classList.add('active');
     updateTextPosHandle();
   }
 
   function exitTextPosMode() {
     state.textPosMode = false;
+    updateStickerTransformHandle();
     document.getElementById('btn-text-pos')?.classList.remove('active');
     const handle = document.getElementById('text-pos-handle');
     if (handle) handle.hidden = true;
@@ -4085,7 +4095,8 @@
   function updateStickerTransformHandle() {
     const handle = document.getElementById('sticker-transform-handle'); const sticker = selectedSticker(); const canvas = document.getElementById('canvas-preview');
     if (!handle) return;
-    if (!sticker || state.activeTab !== 'stickers' || !canvas || !canvas.width) { handle.hidden = true; return; }
+    if (!sticker || state.activeTab !== 'stickers' || state.cropMode || state.slotCropMode ||
+      state.borderResizeMode || state.textPosMode || !canvas || !canvas.width) { handle.hidden = true; return; }
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) { handle.hidden = true; return; }
     const shorter = Math.min(canvas.width, canvas.height); const width = shorter * sticker.scale * rect.width / canvas.width; const height = width / Math.max(.05, sticker.ratio || 1);

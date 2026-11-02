@@ -56,6 +56,15 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await expect(page.locator('#sticker-transform-handle')).toBeVisible();
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(before);
   const afterFilm = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
+  await page.getByRole('button', { name: /135 胶片/ }).click();
+  await page.getByRole('button', { name: '胶卷暗盒', exact: true }).click();
+  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(50);
+  await page.locator('.sticker-card[data-sticker-id="135-cassette-portra400"]').evaluate(el => el.click());
+  await expect(page.locator('#sticker-selected-name')).toHaveText('PORTRA 400 暗盒');
+  const cassetteHandle = await page.locator('#sticker-transform-handle').boundingBox();
+  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .82)).toBeLessThan(.08);
+  await page.screenshot({ path: `/tmp/photoframe-cassettes-${testInfo.project.name}.png`, fullPage: true });
+  await page.getByRole('button', { name: /135 相机/ }).click();
   await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(afterFilm);
   const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
@@ -70,7 +79,6 @@ test('built-in and personal stickers render and remain editable', async ({ page 
     expect(Math.abs(zoomedHandle.y + zoomedHandle.height / 2 - (zoomedCanvas.y + zoomedCanvas.height / 2))).toBeLessThan(3);
     await page.locator('#btn-zoom-fit').click();
   }
-  await page.getByRole('button', { name: /135 相机/ }).click();
   await page.screenshot({ path: `/tmp/photoframe-cameras-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole('button', { name: /其他/ }).click();
   await page.getByRole('button', { name: '旅行', exact: true }).click();
@@ -94,6 +102,13 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await page.locator('#sticker-stroke-color').fill('#fff4d6');
   await page.locator('#sticker-shadow-enabled').uncheck();
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(beforeEffects);
+  if (testInfo.project.name === 'desktop') {
+    await page.locator('#btn-adjust-crop').click();
+    await expect(page.locator('#crop-overlay')).toBeVisible();
+    await expect(page.locator('#sticker-transform-handle')).toBeHidden();
+    await page.locator('#btn-crop-cancel').click();
+    await expect(page.locator('#sticker-transform-handle')).toBeVisible();
+  }
   const cards = await page.locator('.sticker-card').evaluateAll(items => items.slice(0, 6).map(item => { const r = item.getBoundingClientRect(); return { top:r.top, height:r.height }; }));
   expect(cards.every(card => card.height >= 110)).toBeTruthy();
   expect(cards[3].top).toBeGreaterThanOrEqual(cards[0].top + cards[0].height);
