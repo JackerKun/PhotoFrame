@@ -649,6 +649,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+.zoom-controls { display:flex;align-items:center;gap:8px;flex:none; }
 .zoom-btn {
   width: 28px; height: 28px;
   border-radius: var(--radius-sm);
@@ -676,6 +677,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
   transition: background var(--transition);
 }
 .btn-fit:hover { background: var(--border); }
+.preview-tool-icon { display:inline-flex;align-items:center;justify-content:center;gap:5px; }
+.preview-tool-icon svg { width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none; }
 .btn-pan { height:28px;display:inline-flex;align-items:center;gap:5px;padding:0 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text-3);font-size:11px; }
 .btn-pan svg { width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
 .btn-pan.active:not(:disabled) { border-color:var(--accent-warm);background:rgba(196,169,122,.14);color:var(--text-1); }
@@ -842,8 +845,21 @@ input[type="checkbox"] { accent-color: var(--accent); }
 
   .mobile-nav { display: flex; }
 
-  /* 给底部 tab bar 留空间 */
-  .preview-toolbar { padding-bottom: 64px; }
+  /* 紧凑的图标工具栏；底部导航占位放在工具栏外，避免形成大块空白。 */
+  .preview-toolbar {
+    gap:6px;padding:8px 10px;margin-bottom:58px;height:57px;overflow-x:auto;
+    scrollbar-width:none;overscroll-behavior-x:contain;
+  }
+  .preview-toolbar::-webkit-scrollbar { display:none; }
+  .zoom-controls { gap:3px;padding:3px;border:1px solid var(--border);border-radius:11px;background:var(--bg-input); }
+  .zoom-btn { width:32px;height:32px;background:transparent;flex:0 0 32px; }
+  #zoom-label { min-width:36px;font-size:11px; }
+  .preview-toolbar .preview-tool-icon {
+    width:40px;height:40px;min-width:40px;padding:0;display:inline-grid;place-items:center;border-radius:10px;flex:0 0 40px;
+  }
+  .preview-toolbar .preview-tool-icon svg { width:19px;height:19px; }
+  .preview-toolbar .tool-label,.toolbar-sep,.preview-size-info { display:none; }
+  .btn-fit { background:transparent;border:0; }
 
   .topbar { padding: 0 12px; }
   .topbar-actions { gap: 6px; }

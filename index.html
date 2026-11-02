@@ -603,32 +603,37 @@
 
       <!-- 底部工具栏 -->
       <div class="preview-toolbar">
-        <button class="zoom-btn" id="btn-zoom-out" title="缩小">−</button>
-        <span id="zoom-label">适应</span>
-        <button class="zoom-btn" id="btn-zoom-in" title="放大">+</button>
-        <button class="btn-fit" id="btn-zoom-fit">适应</button>
-        <button class="btn-pan active" id="btn-pan" type="button" title="放大后在画布上拖动平移" aria-label="抓手工具" aria-pressed="true" disabled>
+        <div class="zoom-controls" aria-label="画布缩放">
+          <button class="zoom-btn" id="btn-zoom-out" title="缩小" aria-label="缩小">−</button>
+          <span id="zoom-label">适应</span>
+          <button class="zoom-btn" id="btn-zoom-in" title="放大" aria-label="放大">+</button>
+          <button class="btn-fit preview-tool-icon" id="btn-zoom-fit" title="适应画布" aria-label="适应画布">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3m13 5h3a2 2 0 0 0 2-2v-3"/></svg>
+            <span class="tool-label">适应</span>
+          </button>
+        </div>
+        <button class="btn-pan preview-tool-icon active" id="btn-pan" type="button" title="放大后在画布上拖动平移" aria-label="抓手工具" aria-pressed="true" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v5c0 5-3 8-8 8h-1c-3 0-5-2-6-4l-2-4a1.6 1.6 0 0 1 2.8-1.5L8 14Z"/></svg>
-          <span>抓手</span>
+          <span class="tool-label">抓手</span>
         </button>
         <div class="toolbar-sep"></div>
-        <button id="btn-adjust-crop" class="btn-crop-trigger" hidden title="调整照片在当前画幅中的裁切位置">
+        <button id="btn-adjust-crop" class="btn-crop-trigger preview-tool-icon" hidden title="调整照片在当前画幅中的裁切位置" aria-label="调整构图">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2v14a2 2 0 002 2h14"/><path d="M18 22V8a2 2 0 00-2-2H2"/>
           </svg>
-          调整构图
+          <span class="tool-label">调整构图</span>
         </button>
-        <button id="btn-text-pos" class="btn-text-pos" hidden title="拖动文字、方向键微调；Shift + 方向键快速移动">
+        <button id="btn-text-pos" class="btn-text-pos preview-tool-icon" hidden title="拖动文字、方向键微调；Shift + 方向键快速移动" aria-label="文字工具">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
           </svg>
-          文字工具
+          <span class="tool-label">文字工具</span>
         </button>
-        <button id="btn-border-resize" class="btn-border-resize" hidden title="拖拽角点调整边框大小">
+        <button id="btn-border-resize" class="btn-border-resize preview-tool-icon" hidden title="拖拽角点调整边框大小" aria-label="调整边框">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
           </svg>
-          调整边框
+          <span class="tool-label">调整边框</span>
         </button>
         <div id="frame-tools" class="frame-tools" hidden>
           <button id="btn-frame-grid" class="frame-tool-btn active" type="button" title="显示或隐藏三分网格">网格</button>

@@ -36,6 +36,29 @@ test('mobile controls open as a bottom sheet', async ({ page }, testInfo) => {
   await expect(page.locator('#panel-left')).not.toHaveClass(/mobile-open/);
 });
 
+test('mobile preview toolbar uses compact icon controls', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile');
+  await page.locator('#file-input').setInputFiles({ name: 'mobile-toolbar.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await expect(page.locator('#btn-text-pos')).toBeVisible();
+  await expect(page.locator('#btn-border-resize')).toBeVisible();
+
+  const metrics = await page.locator('.preview-toolbar').evaluate(toolbar => ({
+    height: toolbar.getBoundingClientRect().height,
+    labels: [...toolbar.querySelectorAll('.tool-label')].map(label => getComputedStyle(label).display),
+    buttons: [...toolbar.querySelectorAll('.preview-tool-icon')]
+      .filter(button => !button.hidden)
+      .map(button => {
+        const bounds = button.getBoundingClientRect();
+        return { width: bounds.width, height: bounds.height };
+      }),
+  }));
+
+  expect(metrics.height).toBeLessThanOrEqual(58);
+  expect(metrics.labels.every(display => display === 'none')).toBeTruthy();
+  expect(metrics.buttons.every(button => button.width <= 42 && button.height <= 42)).toBeTruthy();
+  await page.screenshot({ path: '/tmp/photoframe-mobile-toolbar.png', fullPage: true });
+});
+
 test('professional theme and style controls affect the canvas', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#theme-select').selectOption('darkroom');
