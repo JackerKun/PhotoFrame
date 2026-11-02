@@ -1775,7 +1775,8 @@
     if (!wrapper) return;
     wrapper.addEventListener('pointerdown', e => {
       if (!wrapper.classList.contains('is-pannable') || (e.button !== 0 && e.button !== 1)) return;
-      if (state.cropMode || state.slotCropMode || state.textPosMode || state.borderResizeMode) return;
+      // 文字工具开启时，文字框本身负责变换；框外仍允许抓手平移画布。
+      if (state.cropMode || state.slotCropMode || state.borderResizeMode) return;
       e.preventDefault();
       _panDragState = {
         pointerId: e.pointerId,
@@ -3499,8 +3500,8 @@
         const preset = activePreset();
         const info   = Object.assign({}, preset?.infoBar, job?.infoOverrides || {});
         const rect = handle.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
+        const cx = Number(handle.dataset.pivotX) || rect.left + rect.width / 2;
+        const cy = Number(handle.dataset.pivotY) || rect.top + rect.height / 2;
         const mode = e.target.classList.contains('text-transform-corner') ? 'scale'
           : e.target.classList.contains('text-transform-rotate') ? 'rotate' : 'move';
         _textDragState = {
@@ -3637,19 +3638,22 @@
     const scaleX = canvasRect.width  / (canvas.width  || 1);
     const scaleY = canvasRect.height / (canvas.height || 1);
 
-    const offsetX  = (info.textOffsetX || 0) * layout.canvasW;
-    const offsetY  = (info.textOffsetY || 0) * (layout.bBottom || 1);
-    const barTop   = layout.bTop + layout.photoH;
-    const textCenterX = layout.canvasW / 2 + offsetX;
-    const textCenterY = barTop + (layout.bBottom || 0) * 0.5 + offsetY;
+    const bounds = layout.textBounds;
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) { handle.hidden = true; return; }
 
     handle.hidden = false;
-    handle.style.left = (canvasRect.left + textCenterX * scaleX) + 'px';
-    handle.style.top  = (canvasRect.top  + textCenterY * scaleY) + 'px';
-    const visualScale = Math.max(.65, Math.min(2, info.textScale ?? 1));
-    handle.style.width = `${150 * visualScale}px`;
-    handle.style.height = `${64 * visualScale}px`;
-    handle.style.transform = `translate(-50%,-50%) rotate(${info.textRotation || 0}deg)`;
+    const screenLeft = canvasRect.left + bounds.x * scaleX;
+    const screenTop = canvasRect.top + bounds.y * scaleY;
+    const pivotX = canvasRect.left + bounds.pivotX * scaleX;
+    const pivotY = canvasRect.top + bounds.pivotY * scaleY;
+    handle.style.left = screenLeft + 'px';
+    handle.style.top = screenTop + 'px';
+    handle.style.width = `${Math.max(24, bounds.width * scaleX)}px`;
+    handle.style.height = `${Math.max(18, bounds.height * scaleY)}px`;
+    handle.style.transformOrigin = `${pivotX - screenLeft}px ${pivotY - screenTop}px`;
+    handle.style.transform = `rotate(${info.textRotation || 0}deg)`;
+    handle.dataset.pivotX = String(pivotX);
+    handle.dataset.pivotY = String(pivotY);
 
     updateAlignmentGuides(info);
   }

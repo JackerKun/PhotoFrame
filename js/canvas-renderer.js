@@ -225,17 +225,34 @@ window.CanvasRenderer = (() => {
       ctx.shadowOffsetY = (info.textShadowY ?? 0.003) * shorter;
     }
 
-    // ── 逐行绘制 ───────────────────────────────────────────────────────────
+    // ── 逐行绘制，并记录真实文字区域供画布上的自由变换选框使用 ──────────────
+    let maxLineWidth = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       ctx.font      = `${line.style} ${line.weight} ${line.size}px "${line.font}"`;
       ctx.fillStyle = line.color;
+      maxLineWidth = Math.max(maxLineWidth, measureStyledTextWidth(ctx, line.text, line.tracking, line.size));
       drawStyledText(ctx, line.text, 0, curY - centerY, line.tracking, line.size, strokeWidth > 0);
       if (i < lines.length - 1) {
         curY += line.size / 2 + lines[i + 1].size / 2 + interGap(i);
       }
     }
     ctx.restore();
+
+    const shadowPad = shadowOpacity > 0
+      ? Math.max(0, (info.textShadowBlur ?? 0.006) * shorter) +
+        Math.max(Math.abs((info.textShadowX ?? 0.003) * shorter), Math.abs((info.textShadowY ?? 0.003) * shorter))
+      : 0;
+    const visualPad = Math.max(4, strokeWidth, shadowPad);
+    const localLeft = info.textAlign === 'left' ? 0 : info.textAlign === 'right' ? -maxLineWidth : -maxLineWidth / 2;
+    layout.textBounds = {
+      x: xPos + localLeft - visualPad,
+      y: centerY - totalH / 2 - visualPad,
+      width: maxLineWidth + visualPad * 2,
+      height: totalH + visualPad * 2,
+      pivotX: xPos,
+      pivotY: centerY,
+    };
   }
 
   function colorWithAlpha(color, alpha) {
@@ -247,6 +264,13 @@ window.CanvasRenderer = (() => {
   }
 
   // 字距、描边和填充统一绘制；保留旧浏览器的逐字符降级路径。
+  function measureStyledTextWidth(ctx, text, trackingEm, fontSize) {
+    const chars = [...text];
+    if (!chars.length) return 0;
+    const spacing = fontSize * trackingEm;
+    return chars.reduce((sum, char) => sum + ctx.measureText(char).width, 0) + spacing * Math.max(0, chars.length - 1);
+  }
+
   function drawStyledText(ctx, text, x, y, trackingEm, fontSize, hasStroke) {
     if ('letterSpacing' in ctx) {
       ctx.letterSpacing = `${Math.round(fontSize * trackingEm)}px`;
@@ -459,6 +483,7 @@ window.CanvasRenderer = (() => {
     if (info.enabled !== false) {
       const layout = { canvasW, canvasH, bTop, bBottom, photoH, shorter };
       await drawInfoBar(ctx, layout, info, job);
+      _lastLayout.textBounds = layout.textBounds || null;
     }
 
     return canvas;

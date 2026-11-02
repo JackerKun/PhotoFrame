@@ -135,6 +135,38 @@ test('pans a zoomed canvas with the hand tool', async ({ page }, testInfo) => {
   await expect(page.locator('#btn-pan')).toBeDisabled();
 });
 
+test('measures the full text selection and keeps hand panning available', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.locator('#file-input').setInputFiles({ name: 'text-pan.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await page.locator('.panel-tab[data-tab="info"]').click();
+  await page.locator('#input-title-tpl').fill('{location}');
+  await page.locator('#input-subtitle-tpl').fill('');
+  await page.locator('#input-location').fill('A');
+  await page.locator('#btn-text-pos').click();
+  await expect(page.locator('#text-pos-handle')).toBeVisible();
+  const shortWidth = (await page.locator('#text-pos-handle').boundingBox()).width;
+
+  await page.locator('#input-location').fill('SONY ILCE-7RM3 / COMPLETE TEXT REGION');
+  await page.waitForTimeout(350);
+  const longWidth = (await page.locator('#text-pos-handle').boundingBox()).width;
+  expect(longWidth).toBeGreaterThan(shortWidth * 4);
+  await page.screenshot({ path: '/tmp/photoframe-text-selection.png', fullPage: true });
+
+  await page.locator('#btn-zoom-in').click();
+  await expect(page.locator('#preview-wrapper')).toHaveClass(/is-pannable/);
+  const before = await page.locator('#preview-wrapper').evaluate(el => ({ left: el.scrollLeft, top: el.scrollTop }));
+  const wrapperBox = await page.locator('#preview-wrapper').boundingBox();
+  const startX = wrapperBox.x + wrapperBox.width / 2;
+  const startY = wrapperBox.y + wrapperBox.height * .35;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX - 80, startY - 60, { steps: 5 });
+  await page.mouse.up();
+  const after = await page.locator('#preview-wrapper').evaluate(el => ({ left: el.scrollLeft, top: el.scrollTop }));
+  expect(after.left).toBeGreaterThan(before.left);
+  expect(after.top).toBeGreaterThan(before.top);
+});
+
 test('collage professional styling renders', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#file-input').setInputFiles([
