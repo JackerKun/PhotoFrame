@@ -29,6 +29,7 @@
     collageLayout: null,  // 当前拼图布局（深拷贝）
     collageCells: [],     // [{file, cropRect}]
     collageActiveSlot: -1,
+    collageStyle: {},
     textPosMode: false,   // 文字位置拖拽模式
     selectedJobIds: new Set(), // 多选胶片条
     borderResizeMode: false,   // 边框拖拽调整模式
@@ -102,11 +103,24 @@
     toast._timer = setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
+  function setupThemeControls() {
+    const select = document.getElementById('theme-select');
+    const theme = Storage.getSettings().theme || 'studio';
+    document.documentElement.dataset.theme = theme;
+    if (!select) return;
+    select.value = theme;
+    select.addEventListener('change', () => {
+      document.documentElement.dataset.theme = select.value;
+      Storage.setSetting('theme', select.value);
+    });
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // 初始化
   // ══════════════════════════════════════════════════════════════════════════
   function init() {
     state.persistOriginals = Storage.getSettings().persistOriginals !== false;
+    setupThemeControls();
     state.presets = Storage.allPresets();
     renderPresetGrid();
     setupUpload();
@@ -902,6 +916,30 @@
   function setupBorderForm() {
     // 颜色
     bindBorderControl('border-color', 'color',  v => v);
+    bindBorderControl('background-mode', 'backgroundMode', v => v);
+    bindBorderControl('background-color-2', 'backgroundColor2', v => v);
+    bindBorderControl('background-angle', 'backgroundAngle', v => parseFloat(v));
+    bindBorderControl('texture-opacity', 'textureOpacity', v => parseFloat(v));
+    bindBorderControl('texture-scale', 'textureScale', v => parseFloat(v));
+    bindBorderControl('photo-stroke-style', 'photoStrokeStyle', v => v);
+    bindBorderControl('photo-stroke-color', 'photoStrokeColor', v => v);
+    bindBorderControl('photo-stroke-width', 'photoStrokeWidth', v => parseFloat(v));
+    bindBorderControl('photo-shadow-opacity', 'photoShadowOpacity', v => parseFloat(v));
+    bindBorderControl('photo-shadow-blur', 'photoShadowBlur', v => parseFloat(v));
+    bindBorderControl('photo-shadow-x', 'photoShadowX', v => parseFloat(v));
+    bindBorderControl('photo-shadow-y', 'photoShadowY', v => parseFloat(v));
+
+    const bgPresets = {
+      gallery: { backgroundMode: 'solid', color: '#FFFFFF', backgroundColor2: '#FFFFFF', textureOpacity: 0 },
+      paper: { backgroundMode: 'paper', color: '#F4EFE4', backgroundColor2: '#E8DFCF', textureOpacity: .18, textureScale: 1 },
+      charcoal: { backgroundMode: 'grain', color: '#171717', backgroundColor2: '#303030', textureOpacity: .2, textureScale: .8, photoStrokeColor: '#E8E3D8', photoStrokeWidth: .003 },
+      sunset: { backgroundMode: 'linear', color: '#DFA06A', backgroundColor2: '#70558C', backgroundAngle: 135, textureOpacity: 0 },
+    };
+    document.querySelectorAll('[data-bg-preset]').forEach(btn => btn.addEventListener('click', () => {
+      const job = activeJob(); if (!job) return;
+      recordHistory('更换背景样式'); Object.assign(job.borderOverrides, bgPresets[btn.dataset.bgPreset]);
+      fillBorderForm(activePreset(), job); schedulePreview();
+    }));
 
     // 边框四个方向（范围 0–0.40）
     ['top', 'bottom', 'left', 'right'].forEach(dir => {
@@ -946,6 +984,7 @@
     bindInfoControl('font-sub-spacing', 'subtitleLetterSpacing', v => parseFloat(v));
     bindInfoControl('font-line-spacing','lineSpacing',     v => parseFloat(v));
     bindInfoControl('font-opacity',     'textOpacity',     v => parseFloat(v));
+    bindInfoControl('font-scale',       'textScale',       v => parseFloat(v));
     bindInfoControl('font-rotation',    'textRotation',    v => parseFloat(v));
     bindInfoControl('font-stroke-color','textStrokeColor', v => v);
     bindInfoControl('font-stroke-width','textStrokeWidth', v => parseFloat(v));
@@ -966,9 +1005,25 @@
     bindTextValueLabel('font-sub-spacing', 'sub-spacing-label', v => `${v.toFixed(2)}em`);
     bindTextValueLabel('font-line-spacing', 'line-spacing-label', v => `${v.toFixed(2)}×`);
     bindTextValueLabel('font-opacity', 'font-opacity-label', v => `${Math.round(v * 100)}%`);
+    bindTextValueLabel('font-scale', 'font-scale-label', v => `${Math.round(v * 100)}%`);
     bindTextValueLabel('font-rotation', 'font-rotation-label', v => `${Math.round(v)}°`);
     bindTextValueLabel('font-stroke-width', 'font-stroke-label', v => `${(v * 100).toFixed(1)}%`);
     bindTextValueLabel('font-shadow-opacity', 'font-shadow-label', v => `${Math.round(v * 100)}%`);
+    bindTextValueLabel('background-angle', 'background-angle-label', v => `${Math.round(v)}°`);
+    bindTextValueLabel('texture-opacity', 'texture-opacity-label', v => `${Math.round(v * 100)}%`);
+    bindTextValueLabel('photo-stroke-width', 'photo-stroke-label', v => `${(v * 100).toFixed(1)}%`);
+    bindTextValueLabel('photo-shadow-opacity', 'photo-shadow-label', v => `${Math.round(v * 100)}%`);
+
+    document.querySelectorAll('[data-text-transform]').forEach(btn => btn.addEventListener('click', () => {
+      const job = activeJob(); if (!job) return;
+      recordHistory('文字变换'); const info = job.infoOverrides ||= {};
+      if (btn.dataset.textTransform === 'rotate-left') info.textRotation = (info.textRotation || 0) - 90;
+      if (btn.dataset.textTransform === 'rotate-right') info.textRotation = (info.textRotation || 0) + 90;
+      if (btn.dataset.textTransform === 'flip-x') info.textFlipX = !info.textFlipX;
+      if (btn.dataset.textTransform === 'flip-y') info.textFlipY = !info.textFlipY;
+      if (btn.dataset.textTransform === 'reset') Object.assign(info, { textScale: 1, textRotation: 0, textFlipX: false, textFlipY: false, textOffsetX: 0, textOffsetY: 0 });
+      fillBorderForm(activePreset(), job); schedulePreview(); updateTextPosHandle();
+    }));
 
     // 对齐
     document.querySelectorAll('.align-btn').forEach(btn => {
@@ -1222,6 +1277,18 @@
 
     const bc = document.getElementById('border-color');
     if (bc) bc.value = b.color || '#FFFFFF';
+    setVal('background-mode', b.backgroundMode || 'solid');
+    setVal('background-color-2', b.backgroundColor2 || '#E8E1D5');
+    setVal('background-angle', b.backgroundAngle ?? 135);
+    setVal('texture-opacity', b.textureOpacity ?? .16);
+    setVal('texture-scale', b.textureScale ?? 1);
+    setVal('photo-stroke-style', b.photoStrokeStyle || 'solid');
+    setVal('photo-stroke-color', b.photoStrokeColor || '#FFFFFF');
+    setVal('photo-stroke-width', b.photoStrokeWidth ?? 0);
+    setVal('photo-shadow-opacity', b.photoShadowOpacity ?? 0);
+    setVal('photo-shadow-blur', b.photoShadowBlur ?? .025);
+    setVal('photo-shadow-x', b.photoShadowX ?? 0);
+    setVal('photo-shadow-y', b.photoShadowY ?? .012);
 
     setVal('font-title',       info.titleFont       || 'Songti SC');
     setVal('font-subtitle',    info.subtitleFont    || 'system-ui');
@@ -1235,6 +1302,7 @@
     setVal('font-sub-spacing', info.subtitleLetterSpacing ?? 0.06);
     setVal('font-line-spacing', info.lineSpacing ?? 0.55);
     setVal('font-opacity', info.textOpacity ?? 1);
+    setVal('font-scale', info.textScale ?? 1);
     setVal('font-rotation', info.textRotation ?? 0);
     setVal('font-stroke-color', info.textStrokeColor || '#FFFFFF');
     setVal('font-stroke-width', info.textStrokeWidth ?? 0);
@@ -1249,9 +1317,14 @@
     setTextLabel('sub-spacing-label', `${(info.subtitleLetterSpacing ?? 0.06).toFixed(2)}em`);
     setTextLabel('line-spacing-label', `${(info.lineSpacing ?? 0.55).toFixed(2)}×`);
     setTextLabel('font-opacity-label', `${Math.round((info.textOpacity ?? 1) * 100)}%`);
+    setTextLabel('font-scale-label', `${Math.round((info.textScale ?? 1) * 100)}%`);
     setTextLabel('font-rotation-label', `${Math.round(info.textRotation ?? 0)}°`);
     setTextLabel('font-stroke-label', `${((info.textStrokeWidth ?? 0) * 100).toFixed(1)}%`);
     setTextLabel('font-shadow-label', `${Math.round((info.textShadowOpacity ?? 0) * 100)}%`);
+    setTextLabel('background-angle-label', `${Math.round(b.backgroundAngle ?? 135)}°`);
+    setTextLabel('texture-opacity-label', `${Math.round((b.textureOpacity ?? .16) * 100)}%`);
+    setTextLabel('photo-stroke-label', `${((b.photoStrokeWidth ?? 0) * 100).toFixed(1)}%`);
+    setTextLabel('photo-shadow-label', `${Math.round((b.photoShadowOpacity ?? 0) * 100)}%`);
 
     const fc = document.getElementById('font-color');
     if (fc) fc.value = info.fontColor || '#1A1A1A';
@@ -2105,6 +2178,21 @@
     subtitleInput?.addEventListener('input', () => {
       if (state.collageLayout) scheduleCollagePreview();
     });
+    const collageStyleControls = {
+      'collage-gap': ['cellGap', Number], 'collage-radius': ['cellRadius', Number],
+      'collage-background-mode': ['backgroundMode', String], 'collage-bg-color': ['color', String],
+      'collage-bg-color-2': ['backgroundColor2', String], 'collage-stroke': ['cellStroke', Number],
+      'collage-stroke-color': ['cellStrokeColor', String], 'collage-shadow': ['cellShadow', Boolean],
+    };
+    Object.entries(collageStyleControls).forEach(([id, [key, Type]]) => {
+      const control = document.getElementById(id);
+      control?.addEventListener('input', () => {
+        state.collageStyle[key] = Type === Boolean ? control.checked : Type(control.value);
+        const label = document.getElementById(id === 'collage-gap' ? 'collage-gap-label' : id === 'collage-radius' ? 'collage-radius-label' : '');
+        if (label) label.textContent = `${(Number(control.value) * 100).toFixed(1)}%`;
+        scheduleCollagePreview();
+      });
+    });
 
     // 照片选择器取消
     document.getElementById('btn-picker-cancel')
@@ -2123,6 +2211,7 @@
     state.collageLayout = JSON.parse(JSON.stringify(layout));
     state.collageCells  = Array.from({ length: layout.cellCount }, () => ({ file: null, cropRect: null }));
     state.collageActiveSlot = -1;
+    state.collageStyle = { ...layout.border, backgroundMode: layout.border?.backgroundMode || 'solid', backgroundColor2: layout.border?.backgroundColor2 || '#DED7CA', cellGap: 0, cellRadius: 0, cellStroke: 0, cellStrokeColor: '#FFFFFF', cellShadow: false, textureOpacity: .14 };
     state.collageMode = true;
 
     // 自动预填已上传的照片
@@ -2140,6 +2229,12 @@
 
     setVal('collage-title-input',    '');
     setVal('collage-subtitle-input', '');
+    setVal('collage-background-mode', state.collageStyle.backgroundMode);
+    setVal('collage-bg-color', state.collageStyle.color || '#FFFFFF');
+    setVal('collage-bg-color-2', state.collageStyle.backgroundColor2);
+    setVal('collage-gap', 0); setVal('collage-radius', 0); setVal('collage-stroke', 0);
+    setVal('collage-stroke-color', '#FFFFFF');
+    const collageShadow = document.getElementById('collage-shadow'); if (collageShadow) collageShadow.checked = false;
 
     updateSlotList();
     scheduleCollagePreview();
@@ -2195,7 +2290,7 @@
 
     try {
       const canvas = await CollageRenderer.renderPreview(
-        layout, cellsWithImages, infoOverride, {}, 1000
+        layout, cellsWithImages, infoOverride, state.collageStyle, 1000
       );
       const preview = document.getElementById('collage-canvas');
       if (!preview) return;
@@ -2437,7 +2532,7 @@
 
       const longEdge = state.exportLongEdge || layout.output?.longEdge || 3000;
       const canvas = await CollageRenderer.render(
-        layout, cellsWithImages, infoOverride, longEdge
+        layout, cellsWithImages, infoOverride, longEdge, state.collageStyle
       );
 
       const fmt     = state.exportFormat || layout.output?.format || 'jpeg';
@@ -3178,11 +3273,22 @@
         const job    = activeJob();
         const preset = activePreset();
         const info   = Object.assign({}, preset?.infoBar, job?.infoOverrides || {});
+        const rect = handle.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const mode = e.target.classList.contains('text-transform-corner') ? 'scale'
+          : e.target.classList.contains('text-transform-rotate') ? 'rotate' : 'move';
         _textDragState = {
+          mode,
           startX: e.clientX,
           startY: e.clientY,
           startOffsetX: info.textOffsetX || 0,
           startOffsetY: info.textOffsetY || 0,
+          startScale: info.textScale ?? 1,
+          startRotation: info.textRotation || 0,
+          centerX: cx, centerY: cy,
+          startDistance: Math.max(1, Math.hypot(e.clientX - cx, e.clientY - cy)),
+          startAngle: Math.atan2(e.clientY - cy, e.clientX - cx),
           historySnapshot: historySnapshot(),
         };
       });
@@ -3197,17 +3303,27 @@
         const scaleX = canvasRect.width  / (canvas.width  || 1);
         const scaleY = canvasRect.height / (canvas.height || 1);
 
-        const dxLogical = (e.clientX - _textDragState.startX) / scaleX;
-        const dyLogical = (e.clientY - _textDragState.startY) / scaleY;
-
-        const newOX = Math.max(-TEXT_POS_MAX, Math.min(TEXT_POS_MAX, _textDragState.startOffsetX + dxLogical / layout.canvasW));
-        const newOY = Math.max(-0.70, Math.min(0.70, _textDragState.startOffsetY + dyLogical / (layout.bBottom || 1)));
-
         const job = activeJob();
         if (job) {
           if (!job.infoOverrides) job.infoOverrides = {};
-          job.infoOverrides.textOffsetX = newOX;
-          job.infoOverrides.textOffsetY = newOY;
+          if (_textDragState.mode === 'scale') {
+            const distance = Math.hypot(e.clientX - _textDragState.centerX, e.clientY - _textDragState.centerY);
+            job.infoOverrides.textScale = Math.max(.25, Math.min(3, _textDragState.startScale * distance / _textDragState.startDistance));
+            const scaleInput = document.getElementById('font-scale'); const scaleLabel = document.getElementById('font-scale-label');
+            if (scaleInput) scaleInput.value = job.infoOverrides.textScale;
+            if (scaleLabel) scaleLabel.textContent = `${Math.round(job.infoOverrides.textScale * 100)}%`;
+          } else if (_textDragState.mode === 'rotate') {
+            const angle = Math.atan2(e.clientY - _textDragState.centerY, e.clientX - _textDragState.centerX);
+            job.infoOverrides.textRotation = Math.round(_textDragState.startRotation + (angle - _textDragState.startAngle) * 180 / Math.PI);
+            const rotationInput = document.getElementById('font-rotation'); const rotationLabel = document.getElementById('font-rotation-label');
+            if (rotationInput) rotationInput.value = job.infoOverrides.textRotation;
+            if (rotationLabel) rotationLabel.textContent = `${job.infoOverrides.textRotation}°`;
+          } else {
+            const dxLogical = (e.clientX - _textDragState.startX) / scaleX;
+            const dyLogical = (e.clientY - _textDragState.startY) / scaleY;
+            job.infoOverrides.textOffsetX = Math.max(-TEXT_POS_MAX, Math.min(TEXT_POS_MAX, _textDragState.startOffsetX + dxLogical / layout.canvasW));
+            job.infoOverrides.textOffsetY = Math.max(-0.70, Math.min(0.70, _textDragState.startOffsetY + dyLogical / (layout.bBottom || 1)));
+          }
         }
 
         // 同步滑块
@@ -3215,8 +3331,9 @@
         const oxL = document.getElementById('text-offset-x-label');
         const oyR = document.getElementById('text-offset-y');
         const oyL = document.getElementById('text-offset-y-label');
-        if (oxR) oxR.value = newOX; if (oxL) oxL.textContent = newOX.toFixed(2);
-        if (oyR) oyR.value = newOY; if (oyL) oyL.textContent = newOY.toFixed(2);
+        const current = job?.infoOverrides || {};
+        if (oxR) oxR.value = current.textOffsetX || 0; if (oxL) oxL.textContent = (current.textOffsetX || 0).toFixed(2);
+        if (oyR) oyR.value = current.textOffsetY || 0; if (oyL) oyL.textContent = (current.textOffsetY || 0).toFixed(2);
 
         schedulePreviewNow();   // 拖拽时立即渲染，不走 180ms 防抖
       });
@@ -3224,7 +3341,7 @@
       handle.addEventListener('pointerup', () => {
         const before = _textDragState?.historySnapshot;
         _textDragState = null;
-        if (before) pushHistorySnapshot(before, '调整文字位置');
+        if (before) pushHistorySnapshot(before, '文字自由变换');
         handle.classList.remove('dragging');
         updateTextPosHandle();
       });
@@ -3304,6 +3421,10 @@
     handle.hidden = false;
     handle.style.left = (canvasRect.left + textCenterX * scaleX) + 'px';
     handle.style.top  = (canvasRect.top  + textCenterY * scaleY) + 'px';
+    const visualScale = Math.max(.65, Math.min(2, info.textScale ?? 1));
+    handle.style.width = `${150 * visualScale}px`;
+    handle.style.height = `${64 * visualScale}px`;
+    handle.style.transform = `translate(-50%,-50%) rotate(${info.textRotation || 0}deg)`;
 
     updateAlignmentGuides(info);
   }

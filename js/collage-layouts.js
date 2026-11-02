@@ -375,13 +375,11 @@ window.CollageRenderer = (() => {
     const canvas = document.createElement('canvas');
     canvas.width  = canvasW;
     canvas.height = canvasH;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 背景
-    ctx.fillStyle = b.color || '#FFFFFF';
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    CanvasRenderer.paintCanvasBackground(ctx, canvasW, canvasH, b);
 
     // 绘制各单元格
     for (let i = 0; i < layout.cells.length; i++) {
@@ -391,20 +389,29 @@ window.CollageRenderer = (() => {
 
       const img = cellData.imgCache || await loadImage(cellData.file);
 
-      const cellX = Math.round(bLeft + cellDef.x * paW);
-      const cellY = Math.round(bTop  + cellDef.y * paH);
-      const cellW = Math.round(cellDef.w * paW);
-      const cellH = Math.round(cellDef.h * paH);
+      const gap = Math.round(shorter * (b.cellGap || 0));
+      const cellX = Math.round(bLeft + cellDef.x * paW) + gap / 2;
+      const cellY = Math.round(bTop  + cellDef.y * paH) + gap / 2;
+      const cellW = Math.max(1, Math.round(cellDef.w * paW) - gap);
+      const cellH = Math.max(1, Math.round(cellDef.h * paH) - gap);
+      const cellRadius = Math.max(0, shorter * (b.cellRadius || 0));
 
       const cellRatio = cellW / cellH;
       const crop = cellData.cropRect || autoCrop(img.naturalWidth, img.naturalHeight, cellRatio);
 
       ctx.save();
+      if (b.cellShadow) {
+        ctx.shadowColor = 'rgba(0,0,0,.32)'; ctx.shadowBlur = shorter * .018; ctx.shadowOffsetY = shorter * .008;
+        ctx.fillStyle = '#fff'; roundCell(ctx, cellX, cellY, cellW, cellH, cellRadius); ctx.fill();
+        ctx.shadowColor = 'transparent';
+      }
       ctx.beginPath();
-      ctx.rect(cellX, cellY, cellW, cellH);
+      roundCell(ctx, cellX, cellY, cellW, cellH, cellRadius);
       ctx.clip();
       ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, cellX, cellY, cellW, cellH);
       ctx.restore();
+      const stroke = Math.max(0, shorter * (b.cellStroke || 0));
+      if (stroke) { ctx.save(); ctx.strokeStyle = b.cellStrokeColor || '#fff'; ctx.lineWidth = stroke; roundCell(ctx, cellX + stroke / 2, cellY + stroke / 2, cellW - stroke, cellH - stroke, Math.max(0, cellRadius - stroke / 2)); ctx.stroke(); ctx.restore(); }
     }
 
     // 信息文字
@@ -414,6 +421,12 @@ window.CollageRenderer = (() => {
     }
 
     return canvas;
+  }
+
+  function roundCell(ctx, x, y, w, h, radius) {
+    const r = Math.min(radius, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
   async function drawInfo(ctx, cW, cH, bTop, bBottom, paH, shorter, info) {

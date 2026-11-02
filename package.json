@@ -10,7 +10,7 @@
     "vendor": "node scripts/sync-vendor.mjs",
     "test": "playwright test",
     "test:smoke": "playwright test tests/smoke.spec.js",
-    "check": "node --check js/app.js && node --check js/canvas-renderer.js && node --check js/image-decoder.js"
+    "check": "node --check js/app.js && node --check js/canvas-renderer.js && node --check js/collage-layouts.js && node --check js/image-decoder.js"
   },
   "repository": {
     "type": "git",

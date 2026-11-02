@@ -37,6 +37,15 @@
     </div>
 
     <div class="topbar-actions">
+      <label class="theme-picker" title="界面主题">
+        <span>主题</span>
+        <select id="theme-select" aria-label="界面主题">
+          <option value="studio">影棚白</option>
+          <option value="darkroom">暗房黑</option>
+          <option value="warm">暖调纸张</option>
+          <option value="midnight">深夜蓝</option>
+        </select>
+      </label>
       <div id="render-indicator" hidden>
         <div class="render-spinner"></div>
         <span>渲染中</span>
@@ -154,12 +163,40 @@
           <button id="btn-apply-all" class="btn btn-secondary btn-compact" type="button">应用到全部</button>
         </div>
 
-        <div class="section-title">背景颜色</div>
+        <div class="section-title">画布背景</div>
+        <div class="style-presets" aria-label="背景快捷样式">
+          <button type="button" class="style-preset" data-bg-preset="gallery">画廊白</button>
+          <button type="button" class="style-preset" data-bg-preset="paper">艺术纸</button>
+          <button type="button" class="style-preset" data-bg-preset="charcoal">炭黑</button>
+          <button type="button" class="style-preset" data-bg-preset="sunset">日落渐变</button>
+        </div>
         <div class="form-group">
-          <div class="form-row">
-            <input type="color" id="border-color" value="#FFFFFF">
-            <span style="font-size:12px;color:var(--text-2)">边框背景色</span>
+          <label for="background-mode">背景类型</label>
+          <select id="background-mode">
+            <option value="solid">纯色</option>
+            <option value="linear">线性渐变</option>
+            <option value="radial">径向渐变</option>
+            <option value="paper">艺术纸纹</option>
+            <option value="linen">亚麻纹理</option>
+            <option value="grain">胶片颗粒</option>
+            <option value="dots">网点图案</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>主色 / 辅色</label>
+          <div class="form-row color-pair">
+            <input type="color" id="border-color" value="#FFFFFF" title="主色">
+            <input type="color" id="background-color-2" value="#E8E1D5" title="辅色">
           </div>
+        </div>
+        <div class="form-group">
+          <label>渐变角度</label>
+          <div class="range-row"><input type="range" id="background-angle" min="0" max="360" step="1" value="135"><span id="background-angle-label" class="range-value">135°</span></div>
+        </div>
+        <div class="form-group">
+          <label>纹理强度 / 尺度</label>
+          <div class="range-row"><input type="range" id="texture-opacity" min="0" max="0.55" step="0.01" value="0.16"><span id="texture-opacity-label" class="range-value">16%</span></div>
+          <div class="range-row compact-range"><span>尺度</span><input type="range" id="texture-scale" min="0.4" max="3" step="0.1" value="1"></div>
         </div>
 
         <div class="section-title">边框宽度（% 短边）</div>
@@ -171,6 +208,7 @@
             <span style="font-size:11px;color:var(--text-3)">%</span>
           </div>
         </div>
+
         <div class="form-group">
           <label>下边框</label>
           <div class="range-row">
@@ -204,6 +242,22 @@
           </div>
         </div>
 
+        <div class="section-title">照片边缘与景深</div>
+        <div class="form-group">
+          <label>描边样式</label>
+          <div class="form-row">
+            <select id="photo-stroke-style"><option value="solid">实线</option><option value="double">双线</option><option value="none">无</option></select>
+            <input type="color" id="photo-stroke-color" value="#FFFFFF" title="描边颜色">
+          </div>
+          <div class="range-row"><input type="range" id="photo-stroke-width" min="0" max="0.035" step="0.001" value="0"><span id="photo-stroke-label" class="range-value">0%</span></div>
+        </div>
+        <div class="form-group">
+          <label>照片投影</label>
+          <div class="range-row"><input type="range" id="photo-shadow-opacity" min="0" max="0.75" step="0.01" value="0"><span id="photo-shadow-label" class="range-value">0%</span></div>
+          <div class="range-row compact-range"><span>模糊</span><input type="range" id="photo-shadow-blur" min="0" max="0.08" step="0.002" value="0.025"></div>
+          <div class="range-row compact-range"><span>X</span><input type="range" id="photo-shadow-x" min="-0.06" max="0.06" step="0.002" value="0"><span>Y</span><input type="range" id="photo-shadow-y" min="-0.06" max="0.06" step="0.002" value="0.012"></div>
+        </div>
+
         <div class="section-title">信息文字</div>
         <div class="form-group">
           <div class="toggle-row">
@@ -212,6 +266,20 @@
               <input type="checkbox" id="info-toggle" checked>
               <span class="toggle-slider"></span>
             </label>
+          </div>
+        </div>
+        <div class="transform-panel">
+          <div class="transform-panel-head"><strong>变换</strong><span>类 Photoshop 数值控制</span></div>
+          <div class="form-group">
+            <label>整体缩放</label>
+            <div class="range-row"><input type="range" id="font-scale" min="0.25" max="3" step="0.01" value="1"><span id="font-scale-label" class="range-value">100%</span></div>
+          </div>
+          <div class="transform-actions">
+            <button type="button" data-text-transform="rotate-left" title="左旋 90°">↺ 90°</button>
+            <button type="button" data-text-transform="rotate-right" title="右旋 90°">↻ 90°</button>
+            <button type="button" data-text-transform="flip-x" title="水平翻转">↔ 翻转</button>
+            <button type="button" data-text-transform="flip-y" title="垂直翻转">↕ 翻转</button>
+            <button type="button" data-text-transform="reset">重置变换</button>
           </div>
         </div>
         <div class="form-group">
@@ -240,7 +308,6 @@
           <select id="font-title">
             <option value="Songti SC">宋体（Songti SC）</option>
             <option value="Georgia">Georgia（西文衬线）</option>
-            <option value="Georgia">Georgia</option>
             <option value="system-ui">系统无衬线</option>
             <option value="monospace">等宽</option>
           </select>
@@ -486,7 +553,11 @@
       </div>
 
       <!-- 文字位置拖拽句柄（fixed 定位，覆盖于 canvas 上） -->
-      <div id="text-pos-handle" class="text-pos-handle" hidden>⊕</div>
+      <div id="text-pos-handle" class="text-pos-handle" hidden>
+        <span class="text-transform-label">文字变换</span>
+        <span class="text-transform-corner" title="拖拽缩放"></span>
+        <span class="text-transform-rotate" title="拖拽旋转">↻</span>
+      </div>
 
       <!-- 边框拖拽调整句柄 -->
       <div id="border-resize-overlay" hidden>
@@ -603,6 +674,19 @@
           <div class="collage-slots-panel" id="collage-slots-panel">
             <div class="collage-slots-title">照片分配</div>
             <div id="collage-slot-list"></div>
+            <div class="collage-style-panel">
+              <div class="collage-slots-title">版式样式</div>
+              <label>格子间距 <output id="collage-gap-label">0%</output></label>
+              <input type="range" id="collage-gap" min="0" max="0.06" step="0.002" value="0">
+              <label>格子圆角 <output id="collage-radius-label">0%</output></label>
+              <input type="range" id="collage-radius" min="0" max="0.08" step="0.002" value="0">
+              <label>背景类型</label>
+              <select id="collage-background-mode"><option value="solid">纯色</option><option value="linear">渐变</option><option value="paper">艺术纸</option><option value="grain">颗粒</option></select>
+              <div class="form-row color-pair"><input type="color" id="collage-bg-color" value="#ffffff"><input type="color" id="collage-bg-color-2" value="#ded7ca"></div>
+              <label>格子描边</label>
+              <div class="range-row"><input type="range" id="collage-stroke" min="0" max="0.012" step="0.001" value="0"><input type="color" id="collage-stroke-color" value="#ffffff"></div>
+              <label class="toggle-row"><span>格子阴影</span><span class="toggle"><input type="checkbox" id="collage-shadow"><span class="toggle-slider"></span></span></label>
+            </div>
           </div>
           <div class="collage-preview-panel">
             <div id="collage-preview-wrapper">

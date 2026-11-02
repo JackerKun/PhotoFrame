@@ -74,6 +74,45 @@ window.CanvasRenderer = (() => {
     ctx.closePath();
   }
 
+  function paintCanvasBackground(ctx, width, height, style = {}) {
+    const mode = style.backgroundMode || 'solid';
+    const color1 = style.color || '#FFFFFF';
+    const color2 = style.backgroundColor2 || color1;
+    if (mode === 'linear') {
+      const angle = ((style.backgroundAngle ?? 135) - 90) * Math.PI / 180;
+      const cx = width / 2, cy = height / 2, length = Math.abs(width * Math.cos(angle)) + Math.abs(height * Math.sin(angle));
+      const gradient = ctx.createLinearGradient(cx - Math.cos(angle) * length / 2, cy - Math.sin(angle) * length / 2, cx + Math.cos(angle) * length / 2, cy + Math.sin(angle) * length / 2);
+      gradient.addColorStop(0, color1); gradient.addColorStop(1, color2); ctx.fillStyle = gradient;
+    } else if (mode === 'radial') {
+      const gradient = ctx.createRadialGradient(width * .5, height * .42, 0, width * .5, height * .42, Math.max(width, height) * .7);
+      gradient.addColorStop(0, color1); gradient.addColorStop(1, color2); ctx.fillStyle = gradient;
+    } else ctx.fillStyle = color1;
+    ctx.fillRect(0, 0, width, height);
+
+    if (!['paper', 'linen', 'grain', 'dots'].includes(mode)) return;
+    const scale = Math.max(.4, style.textureScale || 1);
+    const size = Math.max(12, Math.round(48 * scale));
+    const tile = document.createElement('canvas'); tile.width = size; tile.height = size;
+    const t = tile.getContext('2d');
+    t.clearRect(0, 0, size, size);
+    if (mode === 'dots') {
+      t.fillStyle = '#000'; t.beginPath(); t.arc(size / 2, size / 2, Math.max(1, size * .045), 0, Math.PI * 2); t.fill();
+    } else if (mode === 'linen') {
+      t.strokeStyle = '#000'; t.lineWidth = 1;
+      for (let p = 2; p < size; p += Math.max(4, size / 8)) { t.globalAlpha = p % 3 ? .24 : .4; t.beginPath(); t.moveTo(p, 0); t.lineTo(p, size); t.stroke(); t.beginPath(); t.moveTo(0, p); t.lineTo(size, p); t.stroke(); }
+    } else if (mode === 'paper') {
+      t.strokeStyle = '#000'; t.lineWidth = .7;
+      for (let p = 3; p < size; p += 5) { t.globalAlpha = .18 + (p % 4) * .04; t.beginPath(); t.moveTo(0, p); t.bezierCurveTo(size * .3, p - 2, size * .7, p + 2, size, p); t.stroke(); }
+    } else {
+      for (let y = 0; y < size; y += 2) for (let x = 0; x < size; x += 2) {
+        const value = (x * 17 + y * 31 + x * y * 7) % 29;
+        t.fillStyle = value % 2 ? '#fff' : '#000'; t.globalAlpha = .08 + (value / 29) * .25; t.fillRect(x, y, 1.2, 1.2);
+      }
+    }
+    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(.6, style.textureOpacity ?? .16));
+    ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, width, height); ctx.restore();
+  }
+
   // ── 字体加载等待 ──────────────────────────────────────────────────────────
   const fontCache = new Set();
   async function ensureFont(fontFamily, size) {
@@ -88,6 +127,7 @@ window.CanvasRenderer = (() => {
   // ── 绘制信息文字 ──────────────────────────────────────────────────────────
   async function drawInfoBar(ctx, layout, info, job) {
     const { canvasW, bTop, bBottom, photoH, shorter } = layout;
+    const textScale = Math.max(.1, info.textScale ?? 1);
     if (!bBottom || bBottom < 8) return;
 
     const titleText    = resolveTemplate(info.titleTemplate    || '', job);
@@ -102,7 +142,7 @@ window.CanvasRenderer = (() => {
           extras.push({
             text:     t,
             font:     el.font     || info.subtitleFont || 'sans-serif',
-            size:     Math.max(7, Math.round(shorter * (el.fontSize    || info.subtitleFontSize || 0.026))),
+            size:     Math.max(7, Math.round(shorter * (el.fontSize    || info.subtitleFontSize || 0.026) * textScale)),
             tracking: el.letterSpacing != null ? el.letterSpacing : 0.04,
             color:    el.color || info.fontColor || '#1A1A1A',
             weight:   el.fontWeight || info.subtitleFontWeight || 400,
@@ -117,8 +157,8 @@ window.CanvasRenderer = (() => {
     const barTop = bTop + photoH;
     const barH   = bBottom;
 
-    const titleSize    = Math.max(10, Math.round(shorter * (info.titleFontSize    || 0.038)));
-    const subtitleSize = Math.max(8,  Math.round(shorter * (info.subtitleFontSize || 0.026)));
+    const titleSize    = Math.max(10, Math.round(shorter * (info.titleFontSize    || 0.038) * textScale));
+    const subtitleSize = Math.max(8,  Math.round(shorter * (info.subtitleFontSize || 0.026) * textScale));
     // 主副标题间距（倍数 × titleSize）
     const gapPx = titleSize * (info.titleGap != null ? info.titleGap : 0.45);
 
@@ -171,6 +211,7 @@ window.CanvasRenderer = (() => {
     ctx.save();
     ctx.translate(xPos, centerY);
     if (rotation) ctx.rotate(rotation);
+    ctx.scale(info.textFlipX ? -1 : 1, info.textFlipY ? -1 : 1);
     ctx.globalAlpha = opacity;
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
@@ -369,9 +410,18 @@ window.CanvasRenderer = (() => {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 背景
-    ctx.fillStyle = b.color || '#FFFFFF';
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    // 背景：纯色、渐变或程序化纹理
+    paintCanvasBackground(ctx, canvasW, canvasH, b);
+
+    const shadowOpacity = Math.max(0, Math.min(1, b.photoShadowOpacity || 0));
+    if (shadowOpacity > 0) {
+      ctx.save();
+      ctx.shadowColor = colorWithAlpha(b.photoShadowColor || '#000000', shadowOpacity);
+      ctx.shadowBlur = Math.max(0, (b.photoShadowBlur ?? .025) * shorter);
+      ctx.shadowOffsetX = (b.photoShadowX || 0) * shorter;
+      ctx.shadowOffsetY = (b.photoShadowY ?? .012) * shorter;
+      ctx.fillStyle = '#fff'; roundRect(ctx, bLeft, bTop, photoW, photoH, radius); ctx.fill(); ctx.restore();
+    }
 
     // ── 照片绘制（含圆角 + 裁切）──────────────────────────────────────────
     if (radius > 0) {
@@ -392,6 +442,17 @@ window.CanvasRenderer = (() => {
     }
 
     if (radius > 0) ctx.restore();
+
+    const strokeWidth = Math.max(0, (b.photoStrokeWidth || 0) * shorter);
+    if (strokeWidth > 0 && b.photoStrokeStyle !== 'none') {
+      ctx.save(); ctx.strokeStyle = b.photoStrokeColor || '#FFFFFF'; ctx.lineWidth = strokeWidth;
+      roundRect(ctx, bLeft + strokeWidth / 2, bTop + strokeWidth / 2, photoW - strokeWidth, photoH - strokeWidth, Math.max(0, radius - strokeWidth / 2)); ctx.stroke();
+      if (b.photoStrokeStyle === 'double' && strokeWidth > 2) {
+        ctx.lineWidth = Math.max(1, strokeWidth * .28); const inset = strokeWidth * 1.35;
+        roundRect(ctx, bLeft + inset, bTop + inset, photoW - inset * 2, photoH - inset * 2, Math.max(0, radius - inset)); ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // 信息文字
     const info = effectiveInfo(preset, job);
@@ -426,5 +487,5 @@ window.CanvasRenderer = (() => {
     return canvas.toDataURL(mimeType, quality);
   }
 
-  return { render, renderPreview, canvasToBlob, canvasToDataURL, resolveTemplate, calculateAutoCrop, getLastLayout };
+  return { render, renderPreview, canvasToBlob, canvasToDataURL, resolveTemplate, calculateAutoCrop, getLastLayout, paintCanvasBackground };
 })();
