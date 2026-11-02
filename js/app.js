@@ -3980,7 +3980,7 @@
       const card = document.createElement('button');
       card.type = 'button'; card.className = 'sticker-card'; card.dataset.stickerId = asset.id; card.draggable = true;
       card.title = '点击居中添加，或拖到照片上的任意位置';
-      const img = document.createElement('img'); img.src = asset.src; img.alt = '';
+      const img = document.createElement('img'); img.src = asset.src; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
       const name = document.createElement('span'); name.textContent = asset.name;
       card.append(img, name);
       if (asset.custom) {
@@ -4027,7 +4027,7 @@
     const before = historySnapshot();
     job.stickers ||= [];
     const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category.startsWith('camera-') ? .20 : .18;
-    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1,
+    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, attribution: asset.attribution || null,
       x: Math.max(0, Math.min(1, position.x ?? .5)), y: Math.max(0, Math.min(1, position.y ?? .5)), scale: defaultScale, rotation: 0, opacity: 1,
       strokeWidth: 0, strokeColor: '#ffffff', shadowEnabled: true, shadowBlur: .035, shadowDistance: .025, shadowOpacity: .28 };
     job.stickers.push(sticker); state.selectedStickerId = sticker.id;
@@ -4089,6 +4089,14 @@
     document.getElementById('sticker-stroke-color').value = sticker.strokeColor || '#ffffff';
     document.getElementById('sticker-shadow-color').value = sticker.shadowColor || '#000000';
     document.getElementById('sticker-shadow-enabled').checked = sticker.shadowEnabled ?? true;
+    const attribution = document.getElementById('sticker-attribution');
+    if (attribution) {
+      attribution.hidden = !sticker.attribution;
+      if (sticker.attribution) {
+        attribution.href = sticker.attribution.source;
+        attribution.textContent = `照片：${sticker.attribution.author || 'Wikimedia Commons 作者'} · ${sticker.attribution.license}`;
+      }
+    }
     updateStickerTransformHandle();
   }
 
@@ -4179,7 +4187,7 @@
         if (!Array.isArray(job.stickers)) job.stickers = [];
         job.stickers.forEach(sticker => {
           const latest = builtInStickers.get(sticker.assetId);
-          if (latest) Object.assign(sticker, { name: latest.name, src: latest.src, ratio: latest.ratio });
+          if (latest) Object.assign(sticker, { name: latest.name, src: latest.src, ratio: latest.ratio, attribution: latest.attribution || null });
           sticker.strokeWidth ??= 0; sticker.strokeColor ||= '#ffffff'; sticker.shadowEnabled ??= true;
           sticker.shadowColor ||= '#000000'; sticker.shadowBlur ??= .035; sticker.shadowDistance ??= .025; sticker.shadowOpacity ??= .28;
         });

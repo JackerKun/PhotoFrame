@@ -817,6 +817,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
     min-height:0;
     overflow:hidden;
     height: auto;
+    position:relative;
+    z-index:0;
   }
 
   #panel-left {
@@ -836,7 +838,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   #panel-left .panel-tabs { padding-top: 14px; }
   .mobile-panel-backdrop {
     position: fixed; inset: 0 0 58px; z-index: 1100; background: rgba(28,28,28,.22);
-    backdrop-filter: blur(1px); display: block;
+    backdrop-filter: blur(1px); display: block; pointer-events:auto;
   }
 
   .preview-area {
@@ -1737,6 +1739,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .sticker-inspector label { display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px;font-size:11px;color:var(--text-2); }
 .sticker-inspector label input { grid-column:1 / -1;width:100%; }
 .sticker-inspector output { color:var(--text-1);font-variant-numeric:tabular-nums; }
+.sticker-attribution { padding:7px 9px;border:1px solid var(--border);border-radius:8px;color:var(--accent);font-size:10px;line-height:1.35;text-decoration:none;background:var(--bg-input); }
+.sticker-attribution:hover { border-color:var(--accent); }
 .sticker-effect-row { display:grid;grid-template-columns:1fr .75fr 1fr;gap:6px; }
 .sticker-effect-row .sticker-color-field,.sticker-effect-row .sticker-shadow-switch { display:flex;align-items:center;justify-content:space-between;gap:5px;padding:5px 6px;border:1px solid var(--border);border-radius:7px;background:var(--bg-input);font-size:9px;white-space:nowrap; }
 .sticker-effect-row .sticker-color-field input { grid-column:auto;width:22px;height:22px;padding:1px;border:0;border-radius:5px;background:transparent;cursor:pointer; }

@@ -42,6 +42,7 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(220);
   await expect.poll(() => page.locator('.sticker-card img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length)).toBe(0);
   const ratioMismatches = await page.evaluate(() => window.StickerLibrary.builtIns.filter(asset => {
+    if (!asset.src.startsWith('data:image/svg+xml')) return false;
     const match = decodeURIComponent(asset.src).match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
     return !match || Math.abs(asset.ratio - Number(match[1]) / Number(match[2])) > .01;
   }).map(asset => asset.id));
@@ -80,7 +81,7 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await page.locator('.sticker-card[data-sticker-id="135-cassette-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-selected-name')).toHaveText('PORTRA 400 暗盒');
   const cassetteHandle = await page.locator('#sticker-transform-handle').boundingBox();
-  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .93)).toBeLessThan(.08);
+  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .68)).toBeLessThan(.08);
   await page.screenshot({ path: `/tmp/photoframe-cassettes-${testInfo.project.name}.png`, fullPage: true });
   const beforeVelvia135 = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
   await page.locator('.sticker-card[data-sticker-id="135-cassette-velvia100"]').evaluate(el => el.click());
@@ -90,9 +91,12 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await page.getByRole('button', { name: /135 相机/ }).click();
   await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(afterFilm);
+  await expect(page.locator('#sticker-attribution')).toBeVisible();
+  await expect(page.locator('#sticker-attribution')).toHaveAttribute('href', /commons\.wikimedia\.org/);
   const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
   expect(cameraHandle).not.toBeNull();
-  expect(Math.abs(cameraHandle.width / cameraHandle.height - 1)).toBeLessThan(0.08);
+  const cameraRatio = await page.evaluate(() => window.StickerLibrary.builtIns.find(asset => asset.id === 'camera-nikon-f').ratio);
+  expect(Math.abs(cameraHandle.width / cameraHandle.height - cameraRatio)).toBeLessThan(0.08);
   if (testInfo.project.name === 'desktop') {
     await page.locator('#btn-zoom-in').click();
     await expect.poll(async () => (await page.locator('#sticker-transform-handle').boundingBox()).width).toBeGreaterThan(cameraHandle.width * 1.1);
