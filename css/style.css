@@ -807,12 +807,14 @@ input[type="checkbox"] { accent-color: var(--accent); }
   .preset-favorite-btn, .preset-menu-btn { opacity: 1; display: flex; }
   :root { --sidebar-w: 100%; }
 
-  body { overflow: auto; }
-  #app { height: auto; min-height: 100dvh; overflow: visible; }
+  body { height: 100dvh; overflow: hidden; }
+  #app { height: 100dvh; min-height: 0; overflow: hidden; }
 
   .workspace {
     flex-direction: column;
-    overflow: visible;
+    flex:1;
+    min-height:0;
+    overflow:hidden;
     height: auto;
   }
 
@@ -837,11 +839,18 @@ input[type="checkbox"] { accent-color: var(--accent); }
   }
 
   .preview-area {
-    min-height: 55vw;
+    flex:1;
+    min-height:0;
     position: relative;
+    overflow:hidden;
   }
 
-  #preview-wrapper { padding: 12px; min-height: 55vw; }
+  #preview-wrapper {
+    min-height:0;
+    padding:12px;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
 
   .mobile-nav { display: flex; }
 

@@ -59,6 +59,39 @@ test('mobile preview toolbar uses compact icon controls', async ({ page }, testI
   await page.screenshot({ path: '/tmp/photoframe-mobile-toolbar.png', fullPage: true });
 });
 
+test('mobile keeps tools visible and pans a tall zoomed canvas vertically', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile');
+  const portraitSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1600"><rect width="800" height="1600" fill="#d8cdbd"/><path d="M0 800h800M400 0v1600" stroke="#514b43" stroke-width="24"/></svg>');
+  await page.locator('#file-input').setInputFiles({ name: 'portrait.svg', mimeType: 'image/svg+xml', buffer: portraitSvg });
+  await page.locator('#btn-zoom-in').click();
+  await expect(page.locator('#btn-pan')).toBeEnabled();
+
+  const viewportHeight = page.viewportSize().height;
+  const toolbarBox = await page.locator('.preview-toolbar').boundingBox();
+  const navBox = await page.locator('.mobile-nav').boundingBox();
+  expect(toolbarBox.y + toolbarBox.height).toBeLessThanOrEqual(navBox.y + 2);
+  expect(navBox.y + navBox.height).toBeLessThanOrEqual(viewportHeight + 1);
+
+  const before = await page.locator('#preview-wrapper').evaluate(wrapper => ({
+    top: wrapper.scrollTop,
+    scrollHeight: wrapper.scrollHeight,
+    clientHeight: wrapper.clientHeight,
+  }));
+  expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+
+  const wrapperBox = await page.locator('#preview-wrapper').boundingBox();
+  const x = wrapperBox.x + wrapperBox.width / 2;
+  const startY = wrapperBox.y + wrapperBox.height * .7;
+  await page.mouse.move(x, startY);
+  await page.mouse.down();
+  await page.mouse.move(x, startY - 180, { steps: 8 });
+  await page.mouse.up();
+
+  const afterTop = await page.locator('#preview-wrapper').evaluate(wrapper => wrapper.scrollTop);
+  expect(afterTop).toBeGreaterThan(before.top + 100);
+  await page.screenshot({ path: '/tmp/photoframe-mobile-vertical-pan.png', fullPage: true });
+});
+
 test('professional theme and style controls affect the canvas', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#theme-select').selectOption('darkroom');
