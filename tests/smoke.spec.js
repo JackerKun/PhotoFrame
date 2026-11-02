@@ -38,7 +38,7 @@ test('built-in and personal stickers render and remain editable', async ({ page 
 
   await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
   if (testInfo.project.name === 'mobile') await page.locator('#panel-left').evaluate(el => el.classList.add('mobile-open'));
-  await expect(page.locator('.sticker-category-btn')).toHaveCount(7);
+  await expect(page.locator('.sticker-category-btn')).toHaveCount(9);
   await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(220);
   await expect.poll(() => page.locator('.sticker-card img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length)).toBe(0);
   const ratioMismatches = await page.evaluate(() => window.StickerLibrary.builtIns.filter(asset => {
@@ -57,7 +57,7 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   });
   expect(filmIdentity.velvia135).toContain('#383878');
   expect(filmIdentity.velvia120).toContain('#383878');
-  expect(filmIdentity.cassetteMarkup).not.toContain('rotate(');
+  expect(filmIdentity.cassetteMarkup).toContain('rotate(-90)');
   expect(filmIdentity.cassetteMarkup).toContain('135 · 36 EXP');
   await page.getByRole('button', { name: /120 胶片/ }).click();
   await expect(page.locator('#sticker-tags')).toBeVisible();
@@ -81,18 +81,19 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await page.locator('.sticker-card[data-sticker-id="135-cassette-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-selected-name')).toHaveText('PORTRA 400 暗盒');
   const cassetteHandle = await page.locator('#sticker-transform-handle').boundingBox();
-  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .68)).toBeLessThan(.08);
+  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .70)).toBeLessThan(.08);
   await page.screenshot({ path: `/tmp/photoframe-cassettes-${testInfo.project.name}.png`, fullPage: true });
   const beforeVelvia135 = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
   await page.locator('.sticker-card[data-sticker-id="135-cassette-velvia100"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-selected-name')).toHaveText('VELVIA 100 暗盒');
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(beforeVelvia135);
   await page.screenshot({ path: `/tmp/photoframe-velvia135-${testInfo.project.name}.png`, fullPage: true });
-  await page.getByRole('button', { name: /135 相机/ }).click();
+  await page.getByRole('button', { name: /135 矢量/ }).click();
   await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(afterFilm);
-  await expect(page.locator('#sticker-attribution')).toBeVisible();
-  await expect(page.locator('#sticker-attribution')).toHaveAttribute('href', /commons\.wikimedia\.org/);
+  await expect(page.locator('#sticker-attribution')).toBeHidden();
+  const vectorCameraSrc = await page.evaluate(() => window.StickerLibrary.builtIns.find(asset => asset.id === 'camera-nikon-f').src);
+  expect(vectorCameraSrc).toMatch(/^data:image\/svg\+xml/);
   const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
   expect(cameraHandle).not.toBeNull();
   const cameraRatio = await page.evaluate(() => window.StickerLibrary.builtIns.find(asset => asset.id === 'camera-nikon-f').ratio);
@@ -106,6 +107,12 @@ test('built-in and personal stickers render and remain editable', async ({ page 
     expect(Math.abs(zoomedHandle.y + zoomedHandle.height / 2 - (zoomedCanvas.y + zoomedCanvas.height / 2))).toBeLessThan(3);
     await page.locator('#btn-zoom-fit').click();
   }
+  await page.getByRole('button', { name: /135 实体/ }).click();
+  await page.locator('.sticker-card[data-sticker-id="camera-real-nikon-f"]').evaluate(el => el.click());
+  await expect(page.locator('#sticker-attribution')).toBeVisible();
+  await expect(page.locator('#sticker-attribution')).toHaveAttribute('href', /commons\.wikimedia\.org/);
+  const realCameraSrc = await page.evaluate(() => window.StickerLibrary.builtIns.find(asset => asset.id === 'camera-real-nikon-f').src);
+  expect(realCameraSrc).toBe('assets/camera-cutouts/nikon-f.svg');
   await page.screenshot({ path: `/tmp/photoframe-cameras-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole('button', { name: /其他/ }).click();
   await page.getByRole('button', { name: '旅行', exact: true }).click();

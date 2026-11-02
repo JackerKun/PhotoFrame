@@ -1,0 +1,308 @@
+{
+  "bronica-etr": {
+    "src": "assets/camera-cutouts/bronica-etr.svg",
+    "ratio": 1.1912350597609562,
+    "author": "Vincent Quach (Invincible)",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Bronica_ETR-Si_system.jpg",
+    "title": "Bronica ETR-Si system.jpg"
+  },
+  "bronica-sq": {
+    "src": "assets/camera-cutouts/bronica-sq.svg",
+    "ratio": 0.8117647058823529,
+    "author": "No machine-readable author provided. Fg2 assumed (based on copyright claims).",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Bronica_SQ_M3355.jpg",
+    "title": "Bronica SQ M3355.jpg"
+  },
+  "canon-ae1": {
+    "src": "assets/camera-cutouts/canon-ae1.svg",
+    "ratio": 1.4413793103448276,
+    "author": "en:User:Cburnett",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Canon_AE-1_front_with_50mm_lens.jpg",
+    "title": "Canon AE-1 front with 50mm lens.jpg"
+  },
+  "canon-f1": {
+    "src": "assets/camera-cutouts/canon-f1.svg",
+    "ratio": 1.2597014925373133,
+    "author": "s58y",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Canon_F-1_(13746363604).jpg",
+    "title": "Canon F-1 (13746363604).jpg"
+  },
+  "canon-p": {
+    "src": "assets/camera-cutouts/canon-p.svg",
+    "ratio": 1.4590747330960854,
+    "author": "Original uploader was Riemann at da.wikipedia",
+    "license": "Public domain",
+    "licenseUrl": "",
+    "source": "https://commons.wikimedia.org/wiki/File:Canon_p01.jpg",
+    "title": "Canon p01.jpg"
+  },
+  "contax-t2": {
+    "src": "assets/camera-cutouts/contax-t2.svg",
+    "ratio": 1.334375,
+    "author": "User:Gisling",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:CONTAX_T2.jpg",
+    "title": "CONTAX T2.jpg"
+  },
+  "diana-f": {
+    "src": "assets/camera-cutouts/diana-f.svg",
+    "ratio": 1.1598360655737705,
+    "author": "Siam Thanachai",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Diana_F%2B.jpg",
+    "title": "Diana F+.jpg"
+  },
+  "fuji-g617": {
+    "src": "assets/camera-cutouts/fuji-g617.svg",
+    "ratio": 1.2209631728045325,
+    "author": "Zebrio from Tokyo, Japan",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:0283_Fuji_G617_Professional_(5461168371).jpg",
+    "title": "0283 Fuji G617 Professional (5461168371).jpg"
+  },
+  "fuji-gx680": {
+    "src": "assets/camera-cutouts/fuji-gx680.svg",
+    "ratio": 1.02880658436214,
+    "author": "DYVER",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Fuji_GX680_-_GXM50_f5.6_-_01.jpg",
+    "title": "Fuji GX680 - GXM50 f5.6 - 01.jpg"
+  },
+  "hasselblad-1600f": {
+    "src": "assets/camera-cutouts/hasselblad-1600f.svg",
+    "ratio": 0.8544600938967136,
+    "author": "Eugene Ilchenko",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Hasselblad_1600F.jpg",
+    "title": "Hasselblad 1600F.jpg"
+  },
+  "holga-120": {
+    "src": "assets/camera-cutouts/holga-120.svg",
+    "ratio": 1.4172661870503598,
+    "author": "Bilby",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Holga_120SF_with_film.jpg",
+    "title": "Holga 120SF with film.jpg"
+  },
+  "instax-wide": {
+    "src": "assets/camera-cutouts/instax-wide.svg",
+    "ratio": 1.4462151394422311,
+    "author": "ChadPerez49",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:FujifilmInstaxWide300March52019.jpg",
+    "title": "FujifilmInstaxWide300March52019.jpg"
+  },
+  "kiev-88": {
+    "src": "assets/camera-cutouts/kiev-88.svg",
+    "ratio": 1.134185303514377,
+    "author": "Andrea Blankenstijn",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kiev_88_and_Arsat_fisheye.jpeg",
+    "title": "Kiev 88 and Arsat fisheye.jpeg"
+  },
+  "konica-c35": {
+    "src": "assets/camera-cutouts/konica-c35.svg",
+    "ratio": 1.3176100628930818,
+    "author": "Thomas Backa from Turku, Finland",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Konica_C35_rangefinder_camera.jpg",
+    "title": "Konica C35 rangefinder camera.jpg"
+  },
+  "leica-m2": {
+    "src": "assets/camera-cutouts/leica-m2.svg",
+    "ratio": 1.5291828793774318,
+    "author": "Shane Lin",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Leica_M2.jpg",
+    "title": "Leica M2.jpg"
+  },
+  "leica-m4": {
+    "src": "assets/camera-cutouts/leica-m4.svg",
+    "ratio": 1.1111111111111112,
+    "author": "Daniel Petrzelka, Daniel P",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Leica_M4_P_cropped.jpg",
+    "title": "Leica M4 P cropped.jpg"
+  },
+  "mamiya-645": {
+    "src": "assets/camera-cutouts/mamiya-645.svg",
+    "ratio": 1.1734104046242775,
+    "author": "Eric Gaba (Sting - fr:Sting)",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Mamiya_645_Super.jpg",
+    "title": "Mamiya 645 Super.jpg"
+  },
+  "mamiya-645super": {
+    "src": "assets/camera-cutouts/mamiya-645super.svg",
+    "ratio": 1.1734104046242775,
+    "author": "Eric Gaba (Sting - fr:Sting)",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Mamiya_645_Super.jpg",
+    "title": "Mamiya 645 Super.jpg"
+  },
+  "mamiya-rb67": {
+    "src": "assets/camera-cutouts/mamiya-rb67.svg",
+    "ratio": 0.7142857142857143,
+    "author": "Eusebius",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mamiya_RB67_de_face.jpg",
+    "title": "Mamiya RB67 de face.jpg"
+  },
+  "minolta-autocord": {
+    "src": "assets/camera-cutouts/minolta-autocord.svg",
+    "ratio": 0.6177474402730375,
+    "author": "David",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Classic_cameras_minolta_autocord_TLR_4_(3368312235).jpg",
+    "title": "Classic cameras minolta autocord TLR 4 (3368312235).jpg"
+  },
+  "minolta-x700": {
+    "src": "assets/camera-cutouts/minolta-x700.svg",
+    "ratio": 1.384297520661157,
+    "author": "Martin Pettitt",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Minolta_X-700_35mm_Camera_With_35-105mm_f3.5_Lense.jpg",
+    "title": "Minolta X-700 35mm Camera With 35-105mm f3.5 Lense.jpg"
+  },
+  "nikon-f": {
+    "src": "assets/camera-cutouts/nikon-f.svg",
+    "ratio": 1.314487632508834,
+    "author": "Dnalor 01",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_F_SLR_camera_with_NIKKOR-S_Auto_1,4_f%3D5,8cm.JPG",
+    "title": "Nikon F SLR camera with NIKKOR-S Auto 1,4 f=5,8cm.JPG"
+  },
+  "nikon-f2": {
+    "src": "assets/camera-cutouts/nikon-f2.svg",
+    "ratio": 1.1417525773195876,
+    "author": "Photopath at flickr",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_F2.jpg",
+    "title": "Nikon F2.jpg"
+  },
+  "nikon-f3": {
+    "src": "assets/camera-cutouts/nikon-f3.svg",
+    "ratio": 1.2990033222591362,
+    "author": "Photopath at flickr",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_F3.jpg",
+    "title": "Nikon F3.jpg"
+  },
+  "nikon-fm2": {
+    "src": "assets/camera-cutouts/nikon-fm2.svg",
+    "ratio": 1.6214285714285714,
+    "author": "Johan from Turku / Åbo (from Ostrobothnia), Finland",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_FM2_black.jpg",
+    "title": "Nikon FM2 black.jpg"
+  },
+  "nikon-s2": {
+    "src": "assets/camera-cutouts/nikon-s2.svg",
+    "ratio": 2.3609022556390977,
+    "author": "s58y",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikon_S2_Rangefinder_(Chrome_Dial)_with_5cm_f-1.4_lens_(5585559178).jpg",
+    "title": "Nikon S2 Rangefinder (Chrome Dial) with 5cm f-1.4 lens (5585559178).jpg"
+  },
+  "olympus-om1": {
+    "src": "assets/camera-cutouts/olympus-om1.svg",
+    "ratio": 1.2034883720930232,
+    "author": "s58y",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Olympus_OM-1_(13573573703).jpg",
+    "title": "Olympus OM-1 (13573573703).jpg"
+  },
+  "pentax-6x7": {
+    "src": "assets/camera-cutouts/pentax-6x7.svg",
+    "ratio": 1.2688821752265862,
+    "author": "Jan von Erpecom",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pentax_6%C3%977_MU.JPG",
+    "title": "Pentax 6×7 MU.JPG"
+  },
+  "polaroid-sx70": {
+    "src": "assets/camera-cutouts/polaroid-sx70.svg",
+    "ratio": 0.697841726618705,
+    "author": "Stacie from USA",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Polaroid_SX-70_Land_Camera.jpg",
+    "title": "Polaroid SX-70 Land Camera.jpg"
+  },
+  "ricoh-gr1": {
+    "src": "assets/camera-cutouts/ricoh-gr1.svg",
+    "ratio": 0.9122401847575058,
+    "author": "Zebrio from Tokyo, Japan",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:0562_Ricoh_GR1_(9121984605).jpg",
+    "title": "0562 Ricoh GR1 (9121984605).jpg"
+  },
+  "rollei-35": {
+    "src": "assets/camera-cutouts/rollei-35.svg",
+    "ratio": 1.5633802816901408,
+    "author": "D. Meyer",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Rollei_35_S.jpg",
+    "title": "Rollei 35 S.jpg"
+  },
+  "rolleicord": {
+    "src": "assets/camera-cutouts/rolleicord.svg",
+    "ratio": 0.5555555555555556,
+    "author": "User Camerafiend on en.wikipedia",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Rolleicord_Vb.jpg",
+    "title": "Rolleicord Vb.jpg"
+  },
+  "rolleiflex": {
+    "src": "assets/camera-cutouts/rolleiflex.svg",
+    "ratio": 0.765807962529274,
+    "author": "Juhanson",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Rolleiflex_camera.jpg",
+    "title": "Rolleiflex camera.jpg"
+  },
+  "yashica-mat": {
+    "src": "assets/camera-cutouts/yashica-mat.svg",
+    "ratio": 0.6925133689839572,
+    "author": "Eusebius",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Yashica_mat_124G_-_ouvert.JPG",
+    "title": "Yashica mat 124G - ouvert.JPG"
+  }
+}
