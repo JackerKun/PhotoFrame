@@ -36,6 +36,7 @@ class CropEditor {
     this._draggingFrame = false;
     this._draggingHandle = null;
     this._dragStartFrame = null;
+    this._dragStartPointer = null;
     this._lastX = 0; this._lastY = 0;
     this._lastTouchDist = 0;
     this._touchDragging = false;
@@ -441,8 +442,9 @@ class CropEditor {
   _setupEvents() {
     const c = this.canvas;
 
-    // 鼠标
+    // 鼠标 / 触控笔：使用 pointer capture，拖出 canvas 仍可连续调整。
     const onDown = e => {
+      if (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
       // 防御性重置：确保之前未清理的状态不会残留
       this._draggingFrame = false;
       this._draggingHandle = null;
@@ -451,10 +453,10 @@ class CropEditor {
       const hit = this._hitTestHandle(px, py);
       if (!hit) return; // 点在帧框外，忽略
 
-      console.log('[crop] mousedown hit:', hit === 'inside' ? 'inside' : ('edge' in hit ? hit.edge : 'corner'), `px=${px.toFixed(0)} py=${py.toFixed(0)}`, `frame=(${this.frameX.toFixed(0)},${this.frameY.toFixed(0)},${this.frameW.toFixed(0)}x${this.frameH.toFixed(0)})`);
-
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
+      e.preventDefault();
+      try { c.setPointerCapture?.(e.pointerId); } catch { /* synthetic/test pointer */ }
+      this._dragStartPointer = { x: px, y: py };
+      this._dragStartFrame = { x: this.frameX, y: this.frameY, w: this.frameW, h: this.frameH };
 
       if (hit === 'inside') {
         // 拖动帧框
@@ -469,6 +471,7 @@ class CropEditor {
     };
 
     const onMove = e => {
+      if (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
       // 更新鼠标指针
       if (!this._draggingFrame && !this._draggingHandle) {
         const { px, py } = this._getCanvasCoords(e);
@@ -477,15 +480,18 @@ class CropEditor {
         return;
       }
 
-      const dx = (e.clientX - this._lastX);
-      const dy = (e.clientY - this._lastY);
-      this._lastX = e.clientX;
-      this._lastY = e.clientY;
+      e.preventDefault();
+      const { px, py } = this._getCanvasCoords(e);
+      const dx = px - this._dragStartPointer.x;
+      const dy = py - this._dragStartPointer.y;
 
       if (this._draggingFrame) {
-        // 拖动帧框：移动 frame，photo 不动
-        this.frameX += dx;
-        this.frameY += dy;
+        // 始终从按下时的快照计算，避免增量位移反复套回原框造成颤抖。
+        const canvasW = this.canvas.width / this.dpr;
+        const canvasH = this.canvas.height / this.dpr;
+        const margin = Math.round(Math.min(canvasW, canvasH) * 0.02);
+        this.frameX = Math.max(margin, Math.min(canvasW - margin - this.frameW, this._dragStartFrame.x + dx));
+        this.frameY = Math.max(margin, Math.min(canvasH - margin - this.frameH, this._dragStartFrame.y + dy));
         this._clamp();
         this._updateHandlePositions();
         this._schedDraw();
@@ -494,20 +500,24 @@ class CropEditor {
       }
     };
 
-    const onUp = () => {
+    const onUp = e => {
+      try {
+        if (e?.pointerId != null && c.hasPointerCapture?.(e.pointerId)) c.releasePointerCapture(e.pointerId);
+      } catch { /* pointer was already released */ }
       this._draggingFrame = false;
       this._draggingHandle = null;
+      this._dragStartPointer = null;
       c.style.cursor = 'grab';
     };
 
-    c.addEventListener('mousedown', onDown);
-    c.addEventListener('mousemove', onMove);
-    c.addEventListener('mouseup',   onUp);
-    c.addEventListener('mouseleave',onUp);
-    this._handlers.mousedown  = onDown;
-    this._handlers.mousemove  = onMove;
-    this._handlers.mouseup    = onUp;
-    this._handlers.mouseleave = onUp;
+    c.addEventListener('pointerdown', onDown);
+    c.addEventListener('pointermove', onMove);
+    c.addEventListener('pointerup', onUp);
+    c.addEventListener('pointercancel', onUp);
+    this._handlers.pointerdown = onDown;
+    this._handlers.pointermove = onMove;
+    this._handlers.pointerup = onUp;
+    this._handlers.pointercancel = onUp;
 
     // 滚轮缩放
     const onWheel = e => {

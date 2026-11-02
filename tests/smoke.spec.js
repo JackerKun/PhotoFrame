@@ -52,6 +52,35 @@ test('preset backup exports and restores custom presets', async ({ page }, testI
   expect(restored).toEqual({ custom: true, renamed: true, favorite: true });
 });
 
+test('crop frame handle follows continuous drag without jumping back', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="%23999"/></svg>');
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1000; canvas.height = 700;
+    canvas.style.width = '500px'; canvas.style.height = '350px';
+    document.body.appendChild(canvas);
+    const editor = new CropEditor(canvas, image, 1.5, 1);
+    const startWidth = editor.frameW;
+    const rect = canvas.getBoundingClientRect();
+    const scale = rect.width / (canvas.width / editor.dpr);
+    const y = rect.top + (editor.frameY + editor.frameH / 2) * scale;
+    const x = rect.left + (editor.frameX + editor.frameW) * scale;
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, pointerType: 'mouse', clientX: x, clientY: y }));
+    const widths = [];
+    for (const delta of [10, 20, 30, 40]) {
+      canvas.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 7, pointerType: 'mouse', clientX: x + delta * scale, clientY: y }));
+      widths.push(editor.frameW);
+    }
+    canvas.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, pointerType: 'mouse', clientX: x + 40 * scale, clientY: y }));
+    editor.destroy(); canvas.remove();
+    return { startWidth, widths };
+  });
+  expect(result.widths).toEqual([...result.widths].sort((a, b) => a - b));
+  expect(result.widths.at(-1)).toBeGreaterThan(result.startWidth + 20);
+});
+
 test('upload, preset search, edit history and export state', async ({ page }, testInfo) => {
   await expect(page.locator('#btn-export-single')).toBeDisabled();
   await page.locator('#file-input').setInputFiles({ name: 'sample.svg', mimeType: 'image/svg+xml', buffer: svg });
