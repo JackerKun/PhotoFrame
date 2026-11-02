@@ -34,13 +34,22 @@ test('built-in and personal stickers render and remain editable', async ({ page 
 
   await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
   if (testInfo.project.name === 'mobile') await page.locator('#panel-left').evaluate(el => el.classList.add('mobile-open'));
-  await expect(page.locator('.sticker-category-btn')).toHaveCount(9);
-  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(100);
+  await expect(page.locator('.sticker-category-btn')).toHaveCount(7);
+  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(170);
   await expect.poll(() => page.locator('.sticker-card img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length)).toBe(0);
+  await page.getByRole('button', { name: /120 胶片/ }).click();
+  await expect(page.locator('#sticker-tags')).toBeVisible();
+  await page.getByRole('button', { name: 'B&W', exact: true }).click();
+  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(15);
+  await page.getByRole('button', { name: /全部/ }).first().click();
   await page.locator('.sticker-card[data-sticker-id="135-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-inspector')).toBeVisible();
   await expect(page.locator('#sticker-transform-handle')).toBeVisible();
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(before);
+  await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
+  const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
+  expect(cameraHandle).not.toBeNull();
+  expect(Math.abs(cameraHandle.width / cameraHandle.height - 1)).toBeLessThan(0.08);
   const cards = await page.locator('.sticker-card').evaluateAll(items => items.slice(0, 6).map(item => { const r = item.getBoundingClientRect(); return { top:r.top, height:r.height }; }));
   expect(cards.every(card => card.height >= 110)).toBeTruthy();
   expect(cards[3].top).toBeGreaterThanOrEqual(cards[0].top + cards[0].height);

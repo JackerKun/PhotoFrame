@@ -39,6 +39,7 @@
     frameSnapEnabled: true,    // 边缘/中心/三分线吸附
     presetQuery: '',
     stickerCategory: 'all',
+    stickerTag: 'all',
     stickerQuery: '',
     customStickers: [],
     selectedStickerId: null,
@@ -3893,9 +3894,35 @@
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'sticker-category-btn';
       button.classList.toggle('active', state.stickerCategory === category.id);
-      const count = category.id === 'all' ? allStickerAssets().length : allStickerAssets().filter(asset => asset.category === category.id).length;
+      const count = allStickerAssets().filter(asset => stickerCategoryMatches(asset, category.id)).length;
       button.innerHTML = `<span>${category.name}</span><small>${count}</small>`;
-      button.addEventListener('click', () => { state.stickerCategory = category.id; renderStickerCategories(); renderStickerGrid(); });
+      button.addEventListener('click', () => { state.stickerCategory = category.id; state.stickerTag = 'all'; renderStickerCategories(); renderStickerTags(); renderStickerGrid(); });
+      root.appendChild(button);
+    });
+    renderStickerTags();
+  }
+
+  function stickerCategoryMatches(asset, category = state.stickerCategory) {
+    if (category === 'all') return true;
+    if (category === 'decor') return ['marks','tape','travel','shapes'].includes(asset.category);
+    return asset.category === category;
+  }
+
+  function stickerTagMatches(asset) {
+    if (state.stickerTag === 'all') return true;
+    if (state.stickerCategory === 'decor') return asset.category === state.stickerTag;
+    return (asset.filters || []).includes(state.stickerTag);
+  }
+
+  function renderStickerTags() {
+    const root = document.getElementById('sticker-tags');
+    const specs = window.StickerLibrary?.filterSpecs?.[state.stickerCategory] || [];
+    if (!root) return;
+    root.hidden = !specs.length; root.innerHTML = '';
+    specs.forEach(([id, name]) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'sticker-tag-btn';
+      button.classList.toggle('active', state.stickerTag === id); button.textContent = name;
+      button.addEventListener('click', () => { state.stickerTag = id; renderStickerTags(); renderStickerGrid(); });
       root.appendChild(button);
     });
   }
@@ -3906,7 +3933,7 @@
     if (!grid) return;
     const query = state.stickerQuery;
     const assets = allStickerAssets().filter(asset =>
-      (state.stickerCategory === 'all' || asset.category === state.stickerCategory) &&
+      stickerCategoryMatches(asset) && stickerTagMatches(asset) &&
       (!query || `${asset.name} ${asset.tags || ''}`.toLowerCase().includes(query))
     );
     grid.innerHTML = '';
@@ -3940,7 +3967,7 @@
     const ratio = await new Promise(resolve => { const image = new Image(); image.onload = () => resolve(image.naturalWidth / image.naturalHeight || 1); image.onerror = () => resolve(1); image.src = src; });
     const asset = { id: `custom-${uid()}`, name: file.name.replace(/\.[^.]+$/, ''), category: 'custom', tags: '个人 自定义', src, ratio, custom: true, createdAt: Date.now() };
     await SessionStore.saveSticker(asset);
-    state.customStickers.unshift(asset); state.stickerCategory = 'custom';
+    state.customStickers.unshift(asset); state.stickerCategory = 'custom'; state.stickerTag = 'all';
     renderStickerCategories(); renderStickerGrid(); showToast(`已加入个人贴图库：${asset.name}`);
   }
 
@@ -3949,7 +3976,7 @@
     if (!job) return showToast('请先上传照片', 'warn');
     const before = historySnapshot();
     job.stickers ||= [];
-    const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category === 'camera' ? .20 : .18;
+    const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category.startsWith('camera-') ? .20 : .18;
     const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, x: .5, y: .5, scale: defaultScale, rotation: 0, opacity: 1 };
     job.stickers.push(sticker); state.selectedStickerId = sticker.id;
     pushHistorySnapshot(before, '添加贴图'); syncStickerInspector(); schedulePreview();
@@ -4089,8 +4116,13 @@
       }
 
       // 重建缩略图（thumbUrl 已存入 DB，但如果缺失则重新生成）
+      const builtInStickers = new Map((window.StickerLibrary?.builtIns || []).map(asset => [asset.id, asset]));
       for (const job of state.jobs) {
         if (!Array.isArray(job.stickers)) job.stickers = [];
+        job.stickers.forEach(sticker => {
+          const latest = builtInStickers.get(sticker.assetId);
+          if (latest) Object.assign(sticker, { name: latest.name, src: latest.src, ratio: latest.ratio });
+        });
         if (!job.thumbUrl) createThumb(job);
       }
 
