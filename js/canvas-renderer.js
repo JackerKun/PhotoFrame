@@ -45,6 +45,27 @@ window.CanvasRenderer = (() => {
     return pending;
   }
 
+  function colorWithOpacity(color, opacity) {
+    const hex = String(color || '#000000').replace('#', '');
+    if (/^[0-9a-f]{6}$/i.test(hex)) {
+      return `rgba(${parseInt(hex.slice(0,2),16)},${parseInt(hex.slice(2,4),16)},${parseInt(hex.slice(4,6),16)},${Math.max(0,Math.min(1,opacity))})`;
+    }
+    return color || '#000000';
+  }
+
+  function drawStickerOutline(ctx, img, width, height, stroke, color) {
+    const pad = Math.ceil(stroke + 2), outW = Math.ceil(width + pad * 2), outH = Math.ceil(height + pad * 2);
+    const mask = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(outW, outH) : document.createElement('canvas');
+    mask.width = outW; mask.height = outH;
+    const maskCtx = mask.getContext('2d');
+    maskCtx.drawImage(img, pad, pad, width, height);
+    maskCtx.globalCompositeOperation = 'source-in'; maskCtx.fillStyle = color || '#ffffff'; maskCtx.fillRect(0, 0, outW, outH);
+    for (let i = 0; i < 16; i++) {
+      const angle = i / 16 * Math.PI * 2;
+      ctx.drawImage(mask, -width / 2 - pad + Math.cos(angle) * stroke, -height / 2 - pad + Math.sin(angle) * stroke);
+    }
+  }
+
   async function drawStickers(ctx, canvasW, canvasH, shorter, job) {
     for (const sticker of job?.stickers || []) {
       if (!sticker?.src) continue;
@@ -57,6 +78,16 @@ window.CanvasRenderer = (() => {
         ctx.translate((sticker.x ?? .5) * canvasW, (sticker.y ?? .5) * canvasH);
         ctx.rotate((sticker.rotation || 0) * Math.PI / 180);
         ctx.globalAlpha = Math.max(.05, Math.min(1, sticker.opacity ?? 1));
+        const stroke = Math.max(0, Math.min(.08, sticker.strokeWidth || 0)) * width;
+        if (stroke > .25) {
+          drawStickerOutline(ctx, img, width, height, stroke, sticker.strokeColor);
+        }
+        if (sticker.shadowEnabled ?? true) {
+          const distance = Math.max(0, Math.min(.16, sticker.shadowDistance ?? .025)) * width;
+          ctx.shadowColor = colorWithOpacity(sticker.shadowColor || '#000000', sticker.shadowOpacity ?? .28);
+          ctx.shadowBlur = Math.max(0, Math.min(.16, sticker.shadowBlur ?? .035)) * width;
+          ctx.shadowOffsetX = distance * .55; ctx.shadowOffsetY = distance;
+        }
         ctx.drawImage(img, -width / 2, -height / 2, width, height);
         ctx.restore();
       } catch (e) {

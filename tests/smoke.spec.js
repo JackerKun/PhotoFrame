@@ -61,14 +61,39 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   const cameraHandle = await page.locator('#sticker-transform-handle').boundingBox();
   expect(cameraHandle).not.toBeNull();
   expect(Math.abs(cameraHandle.width / cameraHandle.height - 1)).toBeLessThan(0.08);
+  if (testInfo.project.name === 'desktop') {
+    await page.locator('#btn-zoom-in').click();
+    await expect.poll(async () => (await page.locator('#sticker-transform-handle').boundingBox()).width).toBeGreaterThan(cameraHandle.width * 1.1);
+    const zoomedCanvas = await page.locator('#canvas-preview').boundingBox();
+    const zoomedHandle = await page.locator('#sticker-transform-handle').boundingBox();
+    expect(Math.abs(zoomedHandle.x + zoomedHandle.width / 2 - (zoomedCanvas.x + zoomedCanvas.width / 2))).toBeLessThan(3);
+    expect(Math.abs(zoomedHandle.y + zoomedHandle.height / 2 - (zoomedCanvas.y + zoomedCanvas.height / 2))).toBeLessThan(3);
+    await page.locator('#btn-zoom-fit').click();
+  }
   await page.getByRole('button', { name: /135 相机/ }).click();
   await page.screenshot({ path: `/tmp/photoframe-cameras-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole('button', { name: /其他/ }).click();
   await page.getByRole('button', { name: '旅行', exact: true }).click();
-  await page.locator('.sticker-card[data-sticker-id="travel-pin"]').evaluate(el => el.click());
+  const fitCanvas = await page.locator('#canvas-preview').boundingBox();
+  const target = { x: fitCanvas.width * .24, y: fitCanvas.height * .32 };
+  if (testInfo.project.name === 'desktop') {
+    await page.locator('.sticker-card[data-sticker-id="travel-pin"]').dragTo(page.locator('#canvas-preview'), { targetPosition: target });
+  } else {
+    await page.locator('.sticker-card[data-sticker-id="travel-pin"]').evaluate(el => el.click());
+  }
+  await expect(page.locator('#sticker-selected-name')).toHaveText('地点标记');
   const iconHandle = await page.locator('#sticker-transform-handle').boundingBox();
   expect(iconHandle).not.toBeNull();
   expect(Math.abs(iconHandle.width / iconHandle.height - 1)).toBeLessThan(0.08);
+  if (testInfo.project.name === 'desktop') {
+    expect(Math.abs(iconHandle.x + iconHandle.width / 2 - (fitCanvas.x + target.x))).toBeLessThan(4);
+    expect(Math.abs(iconHandle.y + iconHandle.height / 2 - (fitCanvas.y + target.y))).toBeLessThan(4);
+  }
+  const beforeEffects = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
+  await page.locator('#sticker-stroke-width').fill('0.05');
+  await page.locator('#sticker-stroke-color').fill('#fff4d6');
+  await page.locator('#sticker-shadow-enabled').uncheck();
+  await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(beforeEffects);
   const cards = await page.locator('.sticker-card').evaluateAll(items => items.slice(0, 6).map(item => { const r = item.getBoundingClientRect(); return { top:r.top, height:r.height }; }));
   expect(cards.every(card => card.height >= 110)).toBeTruthy();
   expect(cards[3].top).toBeGreaterThanOrEqual(cards[0].top + cards[0].height);

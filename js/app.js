@@ -3149,11 +3149,13 @@
   }
 
   function scheduleBorderOverlaySync() {
-    if ((!state.borderResizeMode && !state.textPosMode) || _borderDragState || _borderOverlaySyncRaf) return;
+    const stickerActive = state.activeTab === 'stickers' && !!selectedSticker();
+    if ((!state.borderResizeMode && !state.textPosMode && !stickerActive) || _borderDragState || _borderOverlaySyncRaf) return;
     _borderOverlaySyncRaf = requestAnimationFrame(() => {
       _borderOverlaySyncRaf = null;
       if (state.borderResizeMode && !_borderDragState) updateBorderResizeHandles();
       if (state.textPosMode) updateTextPosHandle();
+      if (state.activeTab === 'stickers') updateStickerTransformHandle();
     });
   }
 
@@ -3870,20 +3872,47 @@
     bindRange('sticker-scale', 'scale', v => `${Math.round(v * 100)}%`);
     bindRange('sticker-rotation', 'rotation', v => `${Math.round(v)}°`);
     bindRange('sticker-opacity', 'opacity', v => `${Math.round(v * 100)}%`);
+    bindRange('sticker-stroke-width', 'strokeWidth', v => `${Math.round(v * 100)}%`);
+    bindRange('sticker-shadow-blur', 'shadowBlur', v => `${Math.round(v * 100)}%`);
+    bindRange('sticker-shadow-distance', 'shadowDistance', v => `${Math.round(v * 100)}%`);
+    bindRange('sticker-shadow-opacity', 'shadowOpacity', v => `${Math.round(v * 100)}%`);
+    [['sticker-stroke-color','strokeColor'],['sticker-shadow-color','shadowColor']].forEach(([id,key]) => document.getElementById(id)?.addEventListener('input', e => {
+      const sticker = selectedSticker(); if (!sticker) return; sticker[key] = e.target.value; schedulePreviewNow();
+    }));
+    document.getElementById('sticker-shadow-enabled')?.addEventListener('change', e => {
+      const sticker = selectedSticker(); if (!sticker) return; sticker.shadowEnabled = e.target.checked; schedulePreviewNow();
+    });
     document.getElementById('btn-sticker-delete')?.addEventListener('click', deleteSelectedSticker);
     document.getElementById('sticker-handle-delete')?.addEventListener('click', e => { e.stopPropagation(); deleteSelectedSticker(); });
     document.getElementById('btn-sticker-duplicate')?.addEventListener('click', duplicateSelectedSticker);
     document.getElementById('btn-sticker-front')?.addEventListener('click', () => moveStickerLayer(true));
     document.getElementById('btn-sticker-back')?.addEventListener('click', () => moveStickerLayer(false));
     setupStickerTransform();
-    document.getElementById('canvas-preview')?.addEventListener('pointerdown', selectStickerAtPointer);
+    const stickerCanvas = document.getElementById('canvas-preview');
+    const previewWrapper = document.getElementById('preview-wrapper');
+    stickerCanvas?.addEventListener('pointerdown', selectStickerAtPointer);
+    previewWrapper?.addEventListener('dragover', e => {
+      if (![...e.dataTransfer.types].includes('application/x-photoframe-sticker')) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; previewWrapper.classList.add('sticker-drop-active');
+    });
+    previewWrapper?.addEventListener('dragleave', e => { if (!previewWrapper.contains(e.relatedTarget)) previewWrapper.classList.remove('sticker-drop-active'); });
+    previewWrapper?.addEventListener('drop', e => {
+      previewWrapper.classList.remove('sticker-drop-active');
+      const assetId = e.dataTransfer.getData('application/x-photoframe-sticker');
+      const asset = allStickerAssets().find(item => item.id === assetId);
+      if (!asset || !stickerCanvas) return;
+      e.preventDefault();
+      const rect = stickerCanvas.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return showToast('请拖到照片画布内', 'warn');
+      addSticker(asset, { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+    });
     document.addEventListener('keydown', e => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.activeTab === 'stickers' && state.selectedStickerId && !/input|textarea|select/i.test(document.activeElement?.tagName || '')) {
         e.preventDefault(); deleteSelectedSticker();
       }
     });
     window.addEventListener('resize', updateStickerTransformHandle);
-    document.querySelector('.preview-area')?.addEventListener('scroll', updateStickerTransformHandle, { passive: true });
+    previewWrapper?.addEventListener('scroll', scheduleBorderOverlaySync, { passive: true });
   }
 
   function renderStickerCategories() {
@@ -3939,7 +3968,8 @@
     grid.innerHTML = '';
     assets.forEach(asset => {
       const card = document.createElement('button');
-      card.type = 'button'; card.className = 'sticker-card'; card.dataset.stickerId = asset.id;
+      card.type = 'button'; card.className = 'sticker-card'; card.dataset.stickerId = asset.id; card.draggable = true;
+      card.title = '点击居中添加，或拖到照片上的任意位置';
       const img = document.createElement('img'); img.src = asset.src; img.alt = '';
       const name = document.createElement('span'); name.textContent = asset.name;
       card.append(img, name);
@@ -3954,6 +3984,16 @@
         card.appendChild(remove);
       }
       card.addEventListener('click', () => addSticker(asset));
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('application/x-photoframe-sticker', asset.id);
+        e.dataTransfer.setData('text/plain', asset.name);
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.getElementById('preview-wrapper')?.classList.remove('sticker-drop-active');
+      });
       grid.appendChild(card);
     });
     if (empty) empty.hidden = !!assets.length;
@@ -3971,13 +4011,15 @@
     renderStickerCategories(); renderStickerGrid(); showToast(`已加入个人贴图库：${asset.name}`);
   }
 
-  function addSticker(asset) {
+  function addSticker(asset, position = { x: .5, y: .5 }) {
     const job = activeJob();
     if (!job) return showToast('请先上传照片', 'warn');
     const before = historySnapshot();
     job.stickers ||= [];
     const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category.startsWith('camera-') ? .20 : .18;
-    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, x: .5, y: .5, scale: defaultScale, rotation: 0, opacity: 1 };
+    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1,
+      x: Math.max(0, Math.min(1, position.x ?? .5)), y: Math.max(0, Math.min(1, position.y ?? .5)), scale: defaultScale, rotation: 0, opacity: 1,
+      strokeWidth: 0, strokeColor: '#ffffff', shadowEnabled: true, shadowBlur: .035, shadowDistance: .025, shadowOpacity: .28 };
     job.stickers.push(sticker); state.selectedStickerId = sticker.id;
     pushHistorySnapshot(before, '添加贴图'); syncStickerInspector(); schedulePreview();
   }
@@ -4029,9 +4071,14 @@
     if (inspector) inspector.hidden = !sticker;
     if (!sticker) { updateStickerTransformHandle(); return; }
     document.getElementById('sticker-selected-name').textContent = sticker.name;
-    [['scale', sticker.scale, `${Math.round(sticker.scale * 100)}%`], ['rotation', sticker.rotation, `${Math.round(sticker.rotation)}°`], ['opacity', sticker.opacity, `${Math.round(sticker.opacity * 100)}%`]].forEach(([key, value, label]) => {
+    [['scale', sticker.scale, `${Math.round(sticker.scale * 100)}%`], ['rotation', sticker.rotation, `${Math.round(sticker.rotation)}°`], ['opacity', sticker.opacity, `${Math.round(sticker.opacity * 100)}%`],
+      ['stroke-width', sticker.strokeWidth ?? 0, `${Math.round((sticker.strokeWidth ?? 0) * 100)}%`], ['shadow-blur', sticker.shadowBlur ?? .035, `${Math.round((sticker.shadowBlur ?? .035) * 100)}%`],
+      ['shadow-distance', sticker.shadowDistance ?? .025, `${Math.round((sticker.shadowDistance ?? .025) * 100)}%`], ['shadow-opacity', sticker.shadowOpacity ?? .28, `${Math.round((sticker.shadowOpacity ?? .28) * 100)}%`]].forEach(([key, value, label]) => {
       document.getElementById(`sticker-${key}`).value = value; document.getElementById(`sticker-${key}-label`).textContent = label;
     });
+    document.getElementById('sticker-stroke-color').value = sticker.strokeColor || '#ffffff';
+    document.getElementById('sticker-shadow-color').value = sticker.shadowColor || '#000000';
+    document.getElementById('sticker-shadow-enabled').checked = sticker.shadowEnabled ?? true;
     updateStickerTransformHandle();
   }
 
@@ -4122,6 +4169,8 @@
         job.stickers.forEach(sticker => {
           const latest = builtInStickers.get(sticker.assetId);
           if (latest) Object.assign(sticker, { name: latest.name, src: latest.src, ratio: latest.ratio });
+          sticker.strokeWidth ??= 0; sticker.strokeColor ||= '#ffffff'; sticker.shadowEnabled ??= true;
+          sticker.shadowColor ||= '#000000'; sticker.shadowBlur ??= .035; sticker.shadowDistance ??= .025; sticker.shadowOpacity ??= .28;
         });
         if (!job.thumbUrl) createThumb(job);
       }

@@ -477,6 +477,15 @@
           <label>大小 <output id="sticker-scale-label">18%</output><input id="sticker-scale" type="range" min="0.04" max="0.70" step="0.01" value="0.18"></label>
           <label>旋转 <output id="sticker-rotation-label">0°</output><input id="sticker-rotation" type="range" min="-180" max="180" step="1" value="0"></label>
           <label>透明度 <output id="sticker-opacity-label">100%</output><input id="sticker-opacity" type="range" min="0.1" max="1" step="0.01" value="1"></label>
+          <div class="sticker-effect-row">
+            <label class="sticker-color-field">描边颜色<input id="sticker-stroke-color" type="color" value="#ffffff" aria-label="贴图描边颜色"></label>
+            <label class="sticker-shadow-switch">阴影<input id="sticker-shadow-enabled" type="checkbox" checked></label>
+            <label class="sticker-color-field">阴影颜色<input id="sticker-shadow-color" type="color" value="#000000" aria-label="贴图阴影颜色"></label>
+          </div>
+          <label>描边粗细 <output id="sticker-stroke-width-label">0%</output><input id="sticker-stroke-width" type="range" min="0" max="0.08" step="0.005" value="0"></label>
+          <label>阴影柔化 <output id="sticker-shadow-blur-label">4%</output><input id="sticker-shadow-blur" type="range" min="0" max="0.16" step="0.005" value="0.035"></label>
+          <label>阴影距离 <output id="sticker-shadow-distance-label">3%</output><input id="sticker-shadow-distance" type="range" min="0" max="0.16" step="0.005" value="0.025"></label>
+          <label>阴影浓度 <output id="sticker-shadow-opacity-label">28%</output><input id="sticker-shadow-opacity" type="range" min="0" max="0.8" step="0.02" value="0.28"></label>
           <div class="sticker-action-row"><button id="btn-sticker-back" type="button">下移一层</button><button id="btn-sticker-front" type="button">置于顶层</button><button id="btn-sticker-duplicate" type="button">复制</button></div>
         </div>
         <p class="sticker-privacy">个人贴图只保存在当前浏览器中，不会上传服务器。</p>
