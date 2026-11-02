@@ -248,6 +248,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .strip-item.active { border-color: var(--accent); }
 .strip-item.multi-selected { box-shadow: 0 0 0 2px #4AAFFF; }
+.strip-item.multi-selected::after { content:'✓';position:absolute;left:3px;top:3px;width:16px;height:16px;display:grid;place-items:center;border-radius:50%;background:#258ee3;color:#fff;font-size:10px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.25); }
+.strip-item.active::before { content:'样板';position:absolute;left:3px;bottom:3px;padding:1px 4px;border-radius:3px;background:var(--accent);color:#fff;font-size:8px;font-weight:700;z-index:2; }
 .strip-item img { width: 100%; height: 100%; object-fit: cover; }
 .strip-item-loading { background: var(--bg-hover); }
 .strip-del {
@@ -608,6 +610,11 @@ input[type="checkbox"] { accent-color: var(--accent); }
   padding: 24px;
   position: relative;
 }
+#preview-wrapper.is-zoomed { align-items:flex-start;justify-content:flex-start; }
+#preview-wrapper.is-zoomed #canvas-preview { flex:none;margin:auto; }
+#preview-wrapper.is-pannable { cursor:grab;touch-action:none; }
+#preview-wrapper.is-panning { cursor:grabbing;user-select:none; }
+#preview-wrapper.is-panning #canvas-preview { pointer-events:none; }
 #original-preview {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: contain; padding: 24px; background: var(--bg);
@@ -669,6 +676,10 @@ input[type="checkbox"] { accent-color: var(--accent); }
   transition: background var(--transition);
 }
 .btn-fit:hover { background: var(--border); }
+.btn-pan { height:28px;display:inline-flex;align-items:center;gap:5px;padding:0 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input);color:var(--text-3);font-size:11px; }
+.btn-pan svg { width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+.btn-pan.active:not(:disabled) { border-color:var(--accent-warm);background:rgba(196,169,122,.14);color:var(--text-1); }
+.btn-pan:disabled { opacity:.4;cursor:not-allowed; }
 .preview-size-info { font-size: 11px; color: var(--text-3); margin-left: auto; }
 
 /* 批量导出进度 */

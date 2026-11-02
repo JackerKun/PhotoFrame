@@ -93,6 +93,48 @@ test('syncs the first photo style to following photos without replacing unique c
   await expect(page.locator('#background-mode')).toHaveValue('solid');
 });
 
+test('keeps the sync source fixed while Ctrl and Shift select targets', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.locator('#file-input').setInputFiles([1, 2, 3, 4, 5].map(index => ({
+    name: `photo-${index}.svg`, mimeType: 'image/svg+xml', buffer: svg,
+  })));
+
+  await page.locator('.strip-item').nth(1).click({ modifiers: ['Control'] });
+  await page.locator('.strip-item').nth(3).click({ modifiers: ['Control'] });
+  await expect(page.locator('.strip-item.active')).toHaveAttribute('data-id', await page.locator('.strip-item').first().getAttribute('data-id'));
+  await expect(page.locator('.strip-item.multi-selected')).toHaveCount(3);
+  await page.locator('#btn-sync-edits').click();
+  await expect(page.locator('#sync-source-summary')).toContainText('photo-1.svg');
+  await expect(page.locator('#sync-selected-count')).toHaveText('2');
+  await page.locator('#btn-sync-cancel').click();
+
+  await page.locator('.strip-item').first().click();
+  await page.locator('.strip-item').nth(3).click({ modifiers: ['Shift'] });
+  await expect(page.locator('.strip-item.active')).toHaveAttribute('data-id', await page.locator('.strip-item').first().getAttribute('data-id'));
+  await expect(page.locator('.strip-item.multi-selected')).toHaveCount(4);
+  await page.locator('#btn-sync-edits').click();
+  await expect(page.locator('#sync-selected-count')).toHaveText('3');
+});
+
+test('pans a zoomed canvas with the hand tool', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.locator('#file-input').setInputFiles({ name: 'pan.svg', mimeType: 'image/svg+xml', buffer: svg });
+  await page.locator('#btn-zoom-in').click();
+  await expect(page.locator('#btn-pan')).toBeEnabled();
+  await expect(page.locator('#preview-wrapper')).toHaveClass(/is-pannable/);
+  const before = await page.locator('#preview-wrapper').evaluate(el => ({ left: el.scrollLeft, top: el.scrollTop }));
+  const box = await page.locator('#canvas-preview').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 90, box.y + box.height / 2 - 70, { steps: 5 });
+  await page.mouse.up();
+  const after = await page.locator('#preview-wrapper').evaluate(el => ({ left: el.scrollLeft, top: el.scrollTop }));
+  expect(after.left).toBeGreaterThan(before.left);
+  expect(after.top).toBeGreaterThan(before.top);
+  await page.locator('#btn-zoom-fit').click();
+  await expect(page.locator('#btn-pan')).toBeDisabled();
+});
+
 test('collage professional styling renders', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.locator('#file-input').setInputFiles([

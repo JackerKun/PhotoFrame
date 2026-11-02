@@ -32,6 +32,8 @@
     collageStyle: {},
     textPosMode: false,   // 文字位置拖拽模式
     selectedJobIds: new Set(), // 多选胶片条
+    selectionAnchorId: null,   // Shift 连选的起点（同时也是当前同步样板）
+    panEnabled: true,          // 放大预览后的抓手工具
     borderResizeMode: false,   // 边框拖拽调整模式
     frameGridEnabled: true,    // 边框编辑三分网格
     frameSnapEnabled: true,    // 边缘/中心/三分线吸附
@@ -53,6 +55,7 @@
   let _borderOverlaySyncRaf = null;
   let sessionSaveDebounce = null;
   let cropEditorInstance = null;
+  let _panDragState = null;
   let cropHistorySnapshot = null;
   let collagePreviewDebounce = null;
 
@@ -248,6 +251,7 @@
   function updateFilmstrip() {
     const strip = document.getElementById('filmstrip');
     if (!strip) return;
+    strip.oncontextmenu = e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); };
     strip.innerHTML = '';
 
     if (state.jobs.length === 0) {
@@ -262,6 +266,10 @@
       const isMultiSel = state.selectedJobIds.has(job.id) && state.selectedJobIds.size > 1;
       item.className = 'strip-item' + (isActive ? ' active' : '') + (isMultiSel ? ' multi-selected' : '');
       item.dataset.id = job.id;
+      item.tabIndex = 0;
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', String(state.selectedJobIds.has(job.id)));
+      item.title = isActive ? '当前同步样板' : 'Ctrl/⌘ 点击多选；Shift 点击连续选择';
 
       if (job.thumbUrl) {
         const img = document.createElement('img');
@@ -279,22 +287,24 @@
       del.addEventListener('click', e => { e.stopPropagation(); removeJob(job.id); });
       item.appendChild(del);
 
-      item.addEventListener('click', e => {
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd+click: toggle in multi-selection
-          if (state.selectedJobIds.has(job.id)) {
-            state.selectedJobIds.delete(job.id);
-          } else {
-            state.selectedJobIds.add(job.id);
-          }
-          state.activeJobId = job.id;
-          updateFilmstrip();
-          const j = state.jobs.find(x => x.id === job.id);
-          if (j) { fillInfoForm(j); fillBorderForm(activePreset(), j); }
-        } else {
-          state.selectedJobIds.clear();
-          selectJob(job.id);
+      let modifiedPointerSelection = false;
+      item.addEventListener('pointerdown', e => {
+        if (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+          e.preventDefault();
+          modifiedPointerSelection = true;
+          handleFilmstripSelection(e, job.id);
         }
+      });
+      item.addEventListener('click', e => {
+        if (modifiedPointerSelection) { modifiedPointerSelection = false; return; }
+        handleFilmstripSelection(e, job.id);
+      });
+      item.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFilmstripSelection(e, job.id); }
+      });
+      // macOS 的 Ctrl+点击会额外触发右键菜单；在胶片条多选场景中阻止它。
+      item.addEventListener('contextmenu', e => {
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modifiedPointerSelection = false; }
       });
       strip.appendChild(item);
     });
@@ -304,8 +314,37 @@
     if (counter) counter.textContent = state.jobs.length > 1 ? `${state.jobs.length} 张` : '';
   }
 
+  function handleFilmstripSelection(event, jobId) {
+    const additive = event.ctrlKey || event.metaKey;
+    const range = event.shiftKey;
+    if (!additive && !range) {
+      selectJob(jobId);
+      return;
+    }
+
+    // 多选只改变“同步目标”，不改变当前样板/活动照片。
+    const anchorId = state.selectionAnchorId || state.activeJobId || jobId;
+    if (range) {
+      const anchorIndex = state.jobs.findIndex(j => j.id === anchorId);
+      const targetIndex = state.jobs.findIndex(j => j.id === jobId);
+      if (anchorIndex >= 0 && targetIndex >= 0) {
+        if (!additive) state.selectedJobIds.clear();
+        const [start, end] = anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+        state.jobs.slice(start, end + 1).forEach(j => state.selectedJobIds.add(j.id));
+      }
+    } else if (jobId !== state.activeJobId) {
+      if (state.selectedJobIds.has(jobId)) state.selectedJobIds.delete(jobId);
+      else state.selectedJobIds.add(jobId);
+    }
+
+    // 样板始终包含在选择中，避免用户误以为同步源也会被覆盖。
+    if (state.activeJobId) state.selectedJobIds.add(state.activeJobId);
+    updateFilmstrip();
+  }
+
   function selectJob(id) {
     state.activeJobId = id;
+    state.selectionAnchorId = id;
     const job = activeJob();
 
     // Sync preset from job's presetId
@@ -333,9 +372,13 @@
 
   function removeJob(id) {
     state.jobs = state.jobs.filter(j => j.id !== id);
+    state.selectedJobIds.delete(id);
     SessionStore.deleteJob(id).catch(e => console.warn('删除记录失败', e));
     if (state.activeJobId === id) {
       state.activeJobId = state.jobs[0]?.id || null;
+      state.selectionAnchorId = state.activeJobId;
+      state.selectedJobIds.clear();
+      if (state.activeJobId) state.selectedJobIds.add(state.activeJobId);
     }
     updateFilmstrip();
     updateEmptyState();
@@ -1694,6 +1737,10 @@
     document.getElementById('btn-zoom-in')?.addEventListener('click', () => changeZoom(0.2));
     document.getElementById('btn-zoom-out')?.addEventListener('click', () => changeZoom(-0.2));
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => setZoom('fit'));
+    document.getElementById('btn-pan')?.addEventListener('click', () => {
+      state.panEnabled = !state.panEnabled;
+      updatePanAvailability();
+    });
 
     // Scroll-wheel zoom on the preview wrapper. Border handles and the photo mover
     // live in a fixed sibling overlay, so the same handler must be attached there too.
@@ -1720,6 +1767,53 @@
     wrapper?.addEventListener('wheel', handlePreviewWheel, { passive: false });
     document.getElementById('border-resize-overlay')
       ?.addEventListener('wheel', handlePreviewWheel, { passive: false });
+
+    setupPreviewPanning(wrapper);
+  }
+
+  function setupPreviewPanning(wrapper) {
+    if (!wrapper) return;
+    wrapper.addEventListener('pointerdown', e => {
+      if (!wrapper.classList.contains('is-pannable') || (e.button !== 0 && e.button !== 1)) return;
+      if (state.cropMode || state.slotCropMode || state.textPosMode || state.borderResizeMode) return;
+      e.preventDefault();
+      _panDragState = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        scrollLeft: wrapper.scrollLeft,
+        scrollTop: wrapper.scrollTop,
+      };
+      wrapper.setPointerCapture?.(e.pointerId);
+      wrapper.classList.add('is-panning');
+    });
+    wrapper.addEventListener('pointermove', e => {
+      if (!_panDragState || e.pointerId !== _panDragState.pointerId) return;
+      wrapper.scrollLeft = _panDragState.scrollLeft - (e.clientX - _panDragState.startX);
+      wrapper.scrollTop = _panDragState.scrollTop - (e.clientY - _panDragState.startY);
+    });
+    const finishPan = e => {
+      if (!_panDragState || (e.pointerId != null && e.pointerId !== _panDragState.pointerId)) return;
+      if (wrapper.hasPointerCapture?.(_panDragState.pointerId)) wrapper.releasePointerCapture(_panDragState.pointerId);
+      _panDragState = null;
+      wrapper.classList.remove('is-panning');
+    };
+    wrapper.addEventListener('pointerup', finishPan);
+    wrapper.addEventListener('pointercancel', finishPan);
+  }
+
+  function updatePanAvailability() {
+    const wrapper = document.getElementById('preview-wrapper');
+    const button = document.getElementById('btn-pan');
+    if (!wrapper) return;
+    const canPan = state.zoom !== 'fit' &&
+      (wrapper.scrollWidth > wrapper.clientWidth + 2 || wrapper.scrollHeight > wrapper.clientHeight + 2);
+    wrapper.classList.toggle('is-pannable', canPan && state.panEnabled);
+    if (button) {
+      button.disabled = !canPan;
+      button.classList.toggle('active', canPan && state.panEnabled);
+      button.setAttribute('aria-pressed', String(canPan && state.panEnabled));
+    }
   }
 
   function changeZoom(delta) {
@@ -1739,12 +1833,18 @@
   function applyZoom(wrapper, canvas) {
     if (!wrapper || !canvas) return;
 
+    const wasZoomed = wrapper.classList.contains('is-zoomed');
+    const centerX = wasZoomed && wrapper.scrollWidth ? (wrapper.scrollLeft + wrapper.clientWidth / 2) / wrapper.scrollWidth : .5;
+    const centerY = wasZoomed && wrapper.scrollHeight ? (wrapper.scrollTop + wrapper.clientHeight / 2) / wrapper.scrollHeight : .5;
+
     if (state.zoom === 'fit') {
+      wrapper.classList.remove('is-zoomed', 'is-pannable', 'is-panning');
       canvas.style.width  = '';
       canvas.style.height = '';
       canvas.style.maxWidth  = '100%';
       canvas.style.maxHeight = '100%';
     } else {
+      wrapper.classList.add('is-zoomed');
       const pxW = Math.round(canvas.width  * state.zoom);
       const pxH = Math.round(canvas.height * state.zoom);
       canvas.style.maxWidth  = 'none';
@@ -1752,6 +1852,17 @@
       canvas.style.width  = pxW + 'px';
       canvas.style.height = pxH + 'px';
     }
+
+    requestAnimationFrame(() => {
+      if (state.zoom === 'fit') {
+        wrapper.scrollLeft = 0;
+        wrapper.scrollTop = 0;
+      } else {
+        wrapper.scrollLeft = Math.max(0, centerX * wrapper.scrollWidth - wrapper.clientWidth / 2);
+        wrapper.scrollTop = Math.max(0, centerY * wrapper.scrollHeight - wrapper.clientHeight / 2);
+      }
+      updatePanAvailability();
+    });
 
     // 边框编辑层使用 fixed 定位，不会自动跟随 canvas 的 CSS 尺寸变化。
     // 排入下一帧，并由 ResizeObserver 兜底处理容器重排造成的尺寸变化。
