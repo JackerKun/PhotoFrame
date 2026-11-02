@@ -3893,7 +3893,8 @@
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'sticker-category-btn';
       button.classList.toggle('active', state.stickerCategory === category.id);
-      button.textContent = category.name;
+      const count = category.id === 'all' ? allStickerAssets().length : allStickerAssets().filter(asset => asset.category === category.id).length;
+      button.innerHTML = `<span>${category.name}</span><small>${count}</small>`;
       button.addEventListener('click', () => { state.stickerCategory = category.id; renderStickerCategories(); renderStickerGrid(); });
       root.appendChild(button);
     });
@@ -3948,7 +3949,8 @@
     if (!job) return showToast('请先上传照片', 'warn');
     const before = historySnapshot();
     job.stickers ||= [];
-    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, x: .5, y: .5, scale: asset.category === 'film' ? .22 : .18, rotation: 0, opacity: 1 };
+    const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category === 'camera' ? .20 : .18;
+    const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, x: .5, y: .5, scale: defaultScale, rotation: 0, opacity: 1 };
     job.stickers.push(sticker); state.selectedStickerId = sticker.id;
     pushHistorySnapshot(before, '添加贴图'); syncStickerInspector(); schedulePreview();
   }

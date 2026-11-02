@@ -34,12 +34,17 @@ test('built-in and personal stickers render and remain editable', async ({ page 
 
   await page.locator('.panel-tab[data-tab="stickers"]').evaluate(el => el.click());
   if (testInfo.project.name === 'mobile') await page.locator('#panel-left').evaluate(el => el.classList.add('mobile-open'));
-  await expect(page.locator('.sticker-category-btn')).toHaveCount(8);
-  await expect(page.locator('.sticker-card')).toHaveCount(28);
-  await page.locator('.sticker-card[data-sticker-id="film-portra400"]').evaluate(el => el.click());
+  await expect(page.locator('.sticker-category-btn')).toHaveCount(9);
+  await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(100);
+  await expect.poll(() => page.locator('.sticker-card img').evaluateAll(images => images.filter(image => image.complete && image.naturalWidth === 0).length)).toBe(0);
+  await page.locator('.sticker-card[data-sticker-id="135-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-inspector')).toBeVisible();
   await expect(page.locator('#sticker-transform-handle')).toBeVisible();
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(before);
+  const cards = await page.locator('.sticker-card').evaluateAll(items => items.slice(0, 6).map(item => { const r = item.getBoundingClientRect(); return { top:r.top, height:r.height }; }));
+  expect(cards.every(card => card.height >= 110)).toBeTruthy();
+  expect(cards[3].top).toBeGreaterThanOrEqual(cards[0].top + cards[0].height);
+  await page.screenshot({ path: `/tmp/photoframe-stickers-${testInfo.project.name}.png`, fullPage: true });
 
   await page.locator('#sticker-rotation').fill('24');
   await expect(page.locator('#sticker-rotation-label')).toHaveText('24°');
