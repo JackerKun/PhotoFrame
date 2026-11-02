@@ -46,10 +46,28 @@ test('built-in and personal stickers render and remain editable', async ({ page 
     return !match || Math.abs(asset.ratio - Number(match[1]) / Number(match[2])) > .01;
   }).map(asset => asset.id));
   expect(ratioMismatches).toEqual([]);
+  const filmIdentity = await page.evaluate(() => {
+    const find = id => decodeURIComponent(window.StickerLibrary.builtIns.find(asset => asset.id === id).src);
+    return {
+      velvia135: find('135-cassette-velvia100'),
+      velvia120: find('120-velvia100'),
+      cassetteMarkup: find('135-cassette-portra400'),
+    };
+  });
+  expect(filmIdentity.velvia135).toContain('#383878');
+  expect(filmIdentity.velvia120).toContain('#383878');
+  expect(filmIdentity.cassetteMarkup).not.toContain('rotate(');
+  expect(filmIdentity.cassetteMarkup).toContain('135 · 36 EXP');
   await page.getByRole('button', { name: /120 胶片/ }).click();
   await expect(page.locator('#sticker-tags')).toBeVisible();
   await page.getByRole('button', { name: 'B&W', exact: true }).click();
   await expect.poll(() => page.locator('.sticker-card').count()).toBeGreaterThan(15);
+  await page.getByRole('button', { name: '反转片', exact: true }).click();
+  const beforeVelvia120 = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
+  await page.locator('.sticker-card[data-sticker-id="120-velvia100"]').evaluate(el => el.click());
+  await expect(page.locator('#sticker-selected-name')).toHaveText('VELVIA 100');
+  await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(beforeVelvia120);
+  await page.screenshot({ path: `/tmp/photoframe-velvia120-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole('button', { name: /全部/ }).first().click();
   await page.locator('.sticker-card[data-sticker-id="135-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-inspector')).toBeVisible();
@@ -62,8 +80,13 @@ test('built-in and personal stickers render and remain editable', async ({ page 
   await page.locator('.sticker-card[data-sticker-id="135-cassette-portra400"]').evaluate(el => el.click());
   await expect(page.locator('#sticker-selected-name')).toHaveText('PORTRA 400 暗盒');
   const cassetteHandle = await page.locator('#sticker-transform-handle').boundingBox();
-  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .82)).toBeLessThan(.08);
+  expect(Math.abs(cassetteHandle.width / cassetteHandle.height - .93)).toBeLessThan(.08);
   await page.screenshot({ path: `/tmp/photoframe-cassettes-${testInfo.project.name}.png`, fullPage: true });
+  const beforeVelvia135 = await page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL());
+  await page.locator('.sticker-card[data-sticker-id="135-cassette-velvia100"]').evaluate(el => el.click());
+  await expect(page.locator('#sticker-selected-name')).toHaveText('VELVIA 100 暗盒');
+  await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(beforeVelvia135);
+  await page.screenshot({ path: `/tmp/photoframe-velvia135-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole('button', { name: /135 相机/ }).click();
   await page.locator('.sticker-card[data-sticker-id="camera-nikon-f"]').evaluate(el => el.click());
   await expect.poll(() => page.locator('#canvas-preview').evaluate(canvas => canvas.toDataURL())).not.toBe(afterFilm);

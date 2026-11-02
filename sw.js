@@ -1,4 +1,4 @@
-const CACHE = 'photoframe-v16';
+const CACHE = 'photoframe-v17';
 const ASSETS = [
   './', './index.html', './css/style.css', './favicon.svg', './manifest.webmanifest',
   './vendor/exifr-lite.umd.js', './vendor/jszip.min.js', './vendor/FileSaver.min.js',
