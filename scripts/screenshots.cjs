@@ -273,6 +273,8 @@ async function main() {
     await mobilePage.locator('#file-input').setInputFiles(files.slice(0, 3));
     await expect(mobilePage.locator('#btn-export-single')).toBeEnabled();
     await mobilePage.locator('.mobile-nav-tab[data-panel="info"]').click();
+    await mobilePage.locator('#input-location').tap();
+    await expect(mobilePage.locator('#input-location')).toBeFocused();
     await mobilePage.locator('#input-location').fill('江南 · 水岸');
     await mobilePage.locator('#input-camera').fill('Nikon FM2');
     await mobilePage.locator('#input-film').fill('Kodak Portra 400');

@@ -35,7 +35,7 @@ PHOTOFRAME_SCREENSHOT_DIR="/absolute/path/to/output" \
 node scripts/screenshots.cjs
 ```
 
-The script starts a static server on an automatically allocated loopback port, opens isolated desktop / mobile browser contexts, generates four local PNG inputs and interacts with the actual controls. It waits for rendering and operation messages to settle, checks for uncaught page errors and verifies a real JPEG download. Browser contexts, downloads and the server are closed afterward; no existing browser session is opened.
+The script starts a static server on an automatically allocated loopback port, opens isolated desktop / mobile browser contexts, generates four local PNG inputs and interacts with the actual controls. It waits for rendering and operation messages to settle, checks for uncaught page errors and verifies a real JPEG download. Before filling mobile fields, it taps the location input and asserts focus; a sheet covered by its backdrop therefore fails capture rather than producing an apparently valid screenshot. Browser contexts, downloads and the server are closed afterward; no existing browser session is opened.
 
 The landscapes come from the SVG recipe in `scripts/screenshots.cjs`. Export fields are demonstration values, not extracted EXIF. The camera sticker is an existing vector illustration; no external photographic asset is fetched for the captures. WebP conversion keeps image dimensions while reducing README payload.
 

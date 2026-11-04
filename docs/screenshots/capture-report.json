@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-04T07:07:29.938Z",
+  "generatedAt": "2026-11-04T07:27:04.621Z",
   "version": "1.0.0",
   "synthetic": true,
   "inventory": {
@@ -25,7 +25,7 @@
       "name": "border-editor",
       "width": 1560,
       "height": 1000,
-      "bytes": 71770
+      "bytes": 71686
     },
     {
       "name": "sticker-library",
@@ -37,7 +37,7 @@
       "name": "batch-sync",
       "width": 1560,
       "height": 1000,
-      "bytes": 38956
+      "bytes": 39012
     },
     {
       "name": "crop-editor",
@@ -55,13 +55,13 @@
       "name": "mobile-editor",
       "width": 390,
       "height": 844,
-      "bytes": 12798
+      "bytes": 12752
     },
     {
       "name": "mobile-tools",
       "width": 390,
       "height": 844,
-      "bytes": 10746
+      "bytes": 15492
     }
   ],
   "export": {

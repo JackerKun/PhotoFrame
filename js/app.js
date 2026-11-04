@@ -589,8 +589,8 @@
     document.body.appendChild(menu);
     // 定位到按钮附近
     const rect = e.currentTarget.getBoundingClientRect();
-    menu.style.left = Math.min(rect.left, window.innerWidth - 160) + 'px';
-    menu.style.top  = rect.bottom + 4 + 'px';
+    menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8)) + 'px';
 
     // 点击其他地方关闭
     const outsideClick = ev => {
@@ -2056,14 +2056,21 @@
   // ══════════════════════════════════════════════════════════════════════════
   // 移动端导航
   // ══════════════════════════════════════════════════════════════════════════
+  function closeMobilePanel() {
+    document.getElementById('panel-left')?.classList.remove('mobile-open');
+    const backdrop = document.getElementById('mobile-panel-backdrop');
+    if (backdrop) backdrop.hidden = true;
+    document.querySelectorAll('.mobile-nav-tab').forEach(btn => btn.setAttribute('aria-expanded', 'false'));
+  }
+
   function setupMobileNav() {
     const backdrop = document.getElementById('mobile-panel-backdrop');
-    const closePanel = () => {
-      document.getElementById('panel-left')?.classList.remove('mobile-open');
-      if (backdrop) backdrop.hidden = true;
-    };
-    backdrop?.addEventListener('click', closePanel);
+    const mobile = window.matchMedia('(max-width: 768px)');
+    backdrop?.addEventListener('click', closeMobilePanel);
+    mobile.addEventListener('change', closeMobilePanel);
     document.querySelectorAll('.mobile-nav-tab').forEach(btn => {
+      btn.setAttribute('aria-controls', 'panel-left');
+      btn.setAttribute('aria-expanded', 'false');
       btn.addEventListener('click', () => {
         const panel = btn.dataset.panel;
         document.querySelectorAll('.mobile-nav-tab').forEach(b => b.classList.remove('active'));
@@ -2079,9 +2086,10 @@
         const panelEl = document.getElementById('panel-left');
         panelEl?.classList.toggle('mobile-open', true);
         if (backdrop) backdrop.hidden = false;
+        document.querySelectorAll('.mobile-nav-tab').forEach(b => b.setAttribute('aria-expanded', String(b === btn)));
       });
     });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobilePanel(); });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -2450,6 +2458,7 @@
       if (titleEl) titleEl.textContent =
         `${preset.name}  ·  ${formatRatio(targetRatio)}`;
 
+      closeMobilePanel();
       overlay.hidden = false;
       state.cropMode = true;
       updateStickerTransformHandle();
@@ -2640,6 +2649,7 @@
     state.collageActiveSlot = -1;
     state.collageStyle = createDefaultCollageStyle(layout);
     state.collageMode = true;
+    closeMobilePanel();
 
     // 自动预填已上传的照片
     if (state.jobs.length > 0) {
@@ -2852,6 +2862,7 @@
     const cell   = state.collageCells[slotIndex];
     const layout = state.collageLayout;
     if (!cell?.file || !layout) return;
+    closeMobilePanel();
 
     const cellDef    = layout.cells[slotIndex];
     const cellRatio  = cellDef.w / cellDef.h;
