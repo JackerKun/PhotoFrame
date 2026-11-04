@@ -1,0 +1,172 @@
+<p align="center"><img src="favicon.svg" width="72" height="72" alt="PhotoFrame logo"></p>
+<h1 align="center">PhotoFrame</h1>
+<p align="center">Film formats, clean borders, camera stickers and photo collages.</p>
+<p align="center"><a href="README.md">简体中文</a> · English · <a href="#interface-tour">UI tour</a> · <a href="#quick-start">Quick start</a> · <a href="TECHNICAL_SPEC.md">Technical design</a></p>
+
+PhotoFrame is a browser-based photo framing and layout tool. Import photographs, choose a film format, adjust borders and captions, add stickers or arrange a collage, then export JPEG / PNG files or a batch ZIP. Decoding and rendering happen locally; using the editor does not require uploading photographs or creating an account.
+
+![PhotoFrame workspace with presets, a multi-photo filmstrip and a live framed-image preview](docs/screenshots/workspace.webp)
+
+_Actual application UI. The landscapes are generated locally, with no personal photographs. Camera, film and location fields contain manually entered example information. The current interface uses Simplified Chinese; this guide explains its controls in English._
+
+## Features
+
+| Area                        | Capabilities                                                                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Formats and presets**     | 30 single-image presets covering 135, 120 formats, XPan, 612 / 617, social and print layouts; search, favorites, recent presets and aspect-ratio recommendations  |
+| **Borders and backgrounds** | Independent margins, rounded corners, solid / gradient / paper / linen / grain / halftone backgrounds, strokes and shadows, with draggable inner and outer frames |
+| **Captions**                | Available EXIF fields plus manual location and film information; title / subtitle templates, extra text, fonts, alignment, positioning and transforms             |
+| **Stickers**                | 320 built-in entries across 9 category controls: film, vector / cutout cameras and decorations; personal uploads, scale, rotation, opacity, strokes and shadows   |
+| **Collages**                | 18 layouts with image slots, canvas ratios, whitespace, gaps, corners, materials, alignment, titles and photo ordering                                            |
+| **Batch editing**           | Up to 50 photographs, multi-selection, guided style synchronization, undo / redo, original comparison and ZIP export                                              |
+| **Local workspace**         | Four UI themes, mobile bottom-sheet controls, local session recovery and preset JSON backup / restore                                                             |
+
+Counts refer to the current `1.0.0` data. EXIF availability depends on the source file; film stock and location usually need manual entry.
+
+## Quick start
+
+Runtime dependencies are already included in `vendor/`. No frontend build is needed:
+
+```bash
+git clone https://github.com/JackerKun/PhotoFrame.git
+cd PhotoFrame
+python3 -m http.server 8080 --bind 127.0.0.1
+```
+
+Open **http://127.0.0.1:8080**. On Windows, use `py -m http.server 8080 --bind 127.0.0.1` if `python3` is unavailable. Use a local HTTP server so asset loading and the service worker can work correctly.
+
+1. Import your photographs, or download the [synthetic demo source](docs/screenshots/demo-photo.jpg).
+2. Choose a format under **预设** (Presets). Fill location, camera, film and date under **信息** (Information).
+3. Adjust **边框&字体** (Borders & fonts), **贴图** (Stickers) and the canvas controls.
+4. Choose format, quality and resolution under **导出** (Export), then save from the top toolbar.
+
+JPEG / PNG / TIFF / HEIC / HEIF decoding is local. Exact compatibility depends on the file encoding and browser memory. The demo source contains no real shooting EXIF.
+
+## Interface tour
+
+The following images show real operations with four generated demo images, on desktop and a 390-pixel-wide mobile viewport. Screenshots use compressed WebP; click for a larger view.
+
+### Edit borders directly on the canvas
+
+**Open:** import → **边框&字体**. Adjust margins and background, then choose **调整边框** (Adjust borders) below the preview. Drag corner / edge handles. **文字工具** (Text tool) lets you reposition caption blocks.
+
+![Warm-paper theme with background controls, independent margins and inner / outer frame handles](docs/screenshots/border-editor.webp)
+
+<details>
+<summary>Crop composition: pan, zoom and position the frame</summary>
+
+**Open:** select a format → **调整构图** (Adjust composition). Drag the image, zoom with the wheel or nudge with arrow keys, then choose **完成裁切** (Finish crop). This example uses an XPan format.
+
+![XPan crop editor showing the source image, crop frame, mask and confirmation controls](docs/screenshots/crop-editor.webp)
+
+</details>
+
+### Add film, camera and personal stickers
+
+**Open:** **贴图** → choose a category or search → click an asset. Move, resize and rotate it on the canvas, or adjust opacity, strokes, shadows and layer order in the panel. Personal PNG / JPG / WebP / SVG assets are supported.
+
+![Darkroom theme with vector camera stickers and a selected Nikon F asset with transform controls](docs/screenshots/sticker-library.webp)
+
+Vector camera illustrations and transparent camera cutouts are separate categories. Photographic assets retain their own source / license links; see [Assets and licenses](#assets-and-licenses).
+
+### Assemble a collage in one workspace
+
+**Open:** **预设** → **拼图** (Collage) → select a layout. Set image slots on the left, preview in the center and adjust ratio, whitespace, gaps, corners, strokes, shadows and material on the right. Add titles above, then choose **导出拼图** (Export collage).
+
+![Four-image collage workbench with image slots, titles, live preview and layout / styling controls](docs/screenshots/collage.webp)
+
+<details>
+<summary>Batch sync: unify the style while keeping each image's content</summary>
+
+**Open:** finish one sample image → top double-arrow button. Choose following, selected or all other photographs. Defaults synchronize frame style, text styling and stickers while preserving per-image text and crop composition. Enable text content / crop only when needed. The operation can be undone as a single step.
+
+![Guided synchronization dialog with target ranges and frame, text, crop and sticker options](docs/screenshots/batch-sync.webp)
+
+</details>
+
+<details>
+<summary>Export: JPEG / PNG, quality, resolution and filename templates</summary>
+
+**Open:** **导出**. JPEG quality ranges from 70–100%. Photo long-edge options are 1500 / 2400 / 3000 / 4500 / 6000 pixels or the original size. Use filename variables such as `{name}` and `{index}`, then save one image or a batch ZIP. See the sizing notes below.
+
+![Export panel with file format, JPEG quality, long-edge choices, filename template and save controls](docs/screenshots/export.webp)
+
+</details>
+
+### Use the mobile preview and bottom-sheet controls
+
+The bottom navigation switches presets, information, borders / fonts, stickers and export. Tools open in a bottom sheet; tap the backdrop to return to the preview. Canvas controls use compact icons with zoom and hand panning.
+
+<p align="center">
+  <img src="docs/screenshots/mobile-editor.webp" width="260" alt="Mobile photo preview with compact canvas tools and bottom navigation">
+  <img src="docs/screenshots/mobile-tools.webp" width="260" alt="Mobile bottom sheet with border and font controls">
+</p>
+
+<details>
+<summary>Example of an actual exported image</summary>
+
+This WebP is converted from a real JPEG export for documentation. Download the [original exported JPEG](docs/screenshots/result.jpg) to inspect it. The example uses a 2400-pixel photo long edge and produces **2560 × 2032 pixels** after adding borders.
+
+![Exported synthetic landscape with whitespace, location title, camera and film caption](docs/screenshots/result.webp)
+
+</details>
+
+## Suggested workflow
+
+**One photograph:** import → format → information → border / text / stickers → check composition → save.
+
+**A consistent series:**
+
+1. Import the set and finish the first sample image.
+2. Choose the sync tool and a target range. Recommended options preserve each image's information and crop.
+3. Use the filmstrip to inspect images. `Ctrl / ⌘` toggles selected targets; `Shift` selects a continuous range without changing the current sample.
+4. Refine individual captions and composition, then export a ZIP.
+
+Save a style using **将当前参数保存为预设**. Export a preset JSON backup before switching devices or clearing browser storage, then import it to restore the presets.
+
+Title / subtitle variables include `{location}`, `{camera}`, `{film}`, `{date}`, `{iso}`, `{aperture}`, `{shutter}` and `{lens}`. They use existing EXIF / manually entered information; they do not infer film stock from image pixels.
+
+## Export and offline behavior
+
+| Question                                       | Behavior                                                                                                                                                                                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Why is the export larger than 2400 pixels?** | Single-image resolution refers to the photo area's long edge; borders enlarge the final canvas. The current export-panel summary may also understate the actual dimensions. Use the exported file's pixel dimensions.                                         |
+| **Does original size include borders?**        | It uses the original photo long edge as the layout reference; borders still enlarge the canvas. The output is re-encoded.                                                                                                                                     |
+| **What happens to metadata?**                  | Canvas exports do not copy the source EXIF / GPS. Visible caption text remains. The source file is not overwritten.                                                                                                                                           |
+| **Does it work offline?**                      | A local HTTP server uses bundled resources without an external connection. For remote hosting, load and refresh first so the service worker can take control. Only previously cached resources are available offline; on-demand assets must be visited first. |
+| **Where did my previous session go?**          | Session files use IndexedDB for the current browser and origin; presets / preferences use localStorage. Changing ports, browsers, private mode or clearing site data affects restoration.                                                                     |
+| **Why did import / export fail?**              | Codec variations and browser memory affect HEIC / TIFF and large exports. Try JPEG / PNG, a smaller output or fewer photographs at once.                                                                                                                      |
+
+Preset JSON backups do not contain source photographs and are not photo / session backups. For printing, check actual pixel dimensions, paper size and the output provider's requirements separately.
+
+## Development
+
+Node.js is not required to use the editor. For dependency maintenance, checks and screenshot generation, use Node.js 20+ (a current LTS is recommended):
+
+```bash
+npm ci
+npm run vendor               # When refreshing the bundled dependencies
+npm run check
+npx playwright install chromium
+npm test
+```
+
+The project uses vanilla JavaScript, HTML5 Canvas, exifr, heic2any, UTIF, JSZip and FileSaver.js. Playwright covers desktop and mobile viewports. See [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md).
+
+Run `node scripts/screenshots.cjs` to reproduce the documentation with isolated browser contexts and synthetic inputs. Google Chrome is used by default. See [capture notes](docs/screenshots/README.md) for browser and output overrides.
+
+## Source layout
+
+- `index.html`, `css/`: entry point and responsive UI.
+- `js/`: editing state, presets, rendering, crop / collage tools, stickers, EXIF, local decoding, session storage and export.
+- `assets/`: camera assets and attribution records.
+- `vendor/`: bundled browser dependencies.
+- `docs/screenshots/`: UI captures, a demo source and the real exported example.
+- `scripts/`, `tests/`: maintenance tools and Playwright tests.
+- `sw.js`, `manifest.webmanifest`: offline cache and web-app metadata.
+
+## Assets and licenses
+
+`package.json` declares MIT for project code. Third-party dependencies and image assets retain their own licenses. See [camera-photo attribution](assets/cameras/ATTRIBUTION.json) and [camera-cutout attribution](assets/camera-cutouts/ATTRIBUTION.json); these assets are not uniformly licensed under the code's license. The UI also provides source / license links.
+
+The README landscapes are generated by the capture script and contain no personal photographs. Report issues with browser, file format and reproduction steps in [Issues](https://github.com/JackerKun/PhotoFrame/issues).

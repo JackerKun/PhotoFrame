@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-11-04T07:07:29.938Z",
+  "version": "1.0.0",
+  "synthetic": true,
+  "inventory": {
+    "presets": 30,
+    "collageLayouts": 18,
+    "stickers": 320,
+    "categories": 9
+  },
+  "shots": [
+    {
+      "name": "workspace",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 52552
+    },
+    {
+      "name": "export",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 56932
+    },
+    {
+      "name": "border-editor",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 71770
+    },
+    {
+      "name": "sticker-library",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 75496
+    },
+    {
+      "name": "batch-sync",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 38956
+    },
+    {
+      "name": "crop-editor",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 49018
+    },
+    {
+      "name": "collage",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 86622
+    },
+    {
+      "name": "mobile-editor",
+      "width": 390,
+      "height": 844,
+      "bytes": 12798
+    },
+    {
+      "name": "mobile-tools",
+      "width": 390,
+      "height": 844,
+      "bytes": 10746
+    }
+  ],
+  "export": {
+    "file": "result.jpg",
+    "bytes": 285208,
+    "width": 2560,
+    "height": 2032
+  }
+}
