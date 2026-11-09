@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T02:48:05.843Z",
+  "generatedAt": "2026-11-09T05:13:41.953Z",
   "version": "1.0.0",
   "synthetic": true,
   "inventory": {
@@ -22,10 +22,22 @@
       "bytes": 87920
     },
     {
+      "name": "terrain-map",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 109166
+    },
+    {
+      "name": "city-map",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 93426
+    },
+    {
       "name": "export",
       "width": 1560,
       "height": 1000,
-      "bytes": 54740
+      "bytes": 54652
     },
     {
       "name": "border-editor",
@@ -37,13 +49,13 @@
       "name": "sticker-library",
       "width": 1560,
       "height": 1000,
-      "bytes": 73462
+      "bytes": 73886
     },
     {
       "name": "batch-sync",
       "width": 1560,
       "height": 1000,
-      "bytes": 38784
+      "bytes": 38484
     },
     {
       "name": "crop-editor",

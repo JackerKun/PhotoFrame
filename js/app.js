@@ -128,6 +128,8 @@
   // ══════════════════════════════════════════════════════════════════════════
   // 初始化
   // ══════════════════════════════════════════════════════════════════════════
+  let terrainEditor;
+
   function init() {
     state.persistOriginals = Storage.getSettings().persistOriginals !== false;
     setupThemeControls();
@@ -138,6 +140,23 @@
     setupFilmstrip();
     setupTabs();
     setupStickerLibrary();
+    terrainEditor = TerrainMapEditor.setup({
+      activeJob, recordHistory, schedulePreview, showToast,
+      selectSticker(sticker) {
+        state.selectedStickerId = sticker.id;
+        syncStickerInspector();
+      },
+      addMap(terrain) {
+        addSticker({
+          id: 'terrain-map', name: terrain.mode === 'city' ? '城市地图' : '山地地图', category: 'terrain-map', terrain,
+          ratio: TerrainMap.RATIO, scale: .76,
+        }, { x: .5, y: .30 });
+      },
+      async getGPS(job) {
+        await pendingPhotoImports.get(job);
+        return job.exif?.gps;
+      },
+    });
     setupInfoForm();
     setupBorderForm();
     setupExportControls();
@@ -4264,12 +4283,13 @@
     if (!job) return showToast('请先上传照片', 'warn');
     const before = historySnapshot();
     job.stickers ||= [];
-    const defaultScale = asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category.startsWith('camera-') ? .20 : .18;
+    const defaultScale = asset.scale ?? (asset.category === 'film-135' ? .22 : asset.category === 'film-120' ? .26 : asset.category.startsWith('camera-') ? .20 : .18);
     const sticker = { id: uid(), assetId: asset.id, name: asset.name, src: asset.src, ratio: asset.ratio || 1, attribution: asset.attribution || null,
       x: Math.max(0, Math.min(1, position.x ?? .5)), y: Math.max(0, Math.min(1, position.y ?? .5)), scale: defaultScale, rotation: 0, opacity: 1,
       strokeWidth: 0, strokeColor: '#ffffff', shadowEnabled: true, shadowBlur: .035, shadowDistance: .025, shadowOpacity: .28 };
+    if (asset.terrain) sticker.terrain = asset.terrain;
     job.stickers.push(sticker); state.selectedStickerId = sticker.id;
-    pushHistorySnapshot(before, '添加贴图'); syncStickerInspector(); schedulePreview();
+    pushHistorySnapshot(before, sticker.terrain ? '添加地图叠层' : '添加贴图'); syncStickerInspector(); schedulePreview();
   }
 
   function selectStickerAtPointer(e) {
@@ -4317,8 +4337,11 @@
   function syncStickerInspector() {
     const sticker = selectedSticker(); const inspector = document.getElementById('sticker-inspector');
     if (inspector) inspector.hidden = !sticker;
+    terrainEditor?.sync(sticker);
     if (!sticker) { updateStickerTransformHandle(); return; }
     document.getElementById('sticker-selected-name').textContent = sticker.name;
+    document.getElementById('sticker-image-effects').hidden = Boolean(sticker.terrain);
+    document.getElementById('sticker-scale').max = sticker.terrain ? 1.2 : .7;
     [['scale', sticker.scale, `${Math.round(sticker.scale * 100)}%`], ['rotation', sticker.rotation, `${Math.round(sticker.rotation)}°`], ['opacity', sticker.opacity, `${Math.round(sticker.opacity * 100)}%`],
       ['stroke-width', sticker.strokeWidth ?? 0, `${Math.round((sticker.strokeWidth ?? 0) * 100)}%`], ['shadow-blur', sticker.shadowBlur ?? .035, `${Math.round((sticker.shadowBlur ?? .035) * 100)}%`],
       ['shadow-distance', sticker.shadowDistance ?? .025, `${Math.round((sticker.shadowDistance ?? .025) * 100)}%`], ['shadow-opacity', sticker.shadowOpacity ?? .28, `${Math.round((sticker.shadowOpacity ?? .28) * 100)}%`]].forEach(([key, value, label]) => {
@@ -4365,7 +4388,7 @@
     handle.addEventListener('pointermove', e => {
       const d = _stickerDragState; if (!d) return;
       if (d.mode === 'move') { d.sticker.x = Math.max(0, Math.min(1, d.x + (e.clientX - d.startX) / d.rect.width)); d.sticker.y = Math.max(0, Math.min(1, d.y + (e.clientY - d.startY) / d.rect.height)); }
-      else if (d.mode === 'scale') d.sticker.scale = Math.max(.04, Math.min(.7, d.scale * Math.hypot(e.clientX - d.cx, e.clientY - d.cy) / d.distance));
+      else if (d.mode === 'scale') d.sticker.scale = Math.max(.04, Math.min(d.sticker.terrain ? 1.2 : .7, d.scale * Math.hypot(e.clientX - d.cx, e.clientY - d.cy) / d.distance));
       else d.sticker.rotation = Math.round(d.rotation + (Math.atan2(e.clientY - d.cy, e.clientX - d.cx) - d.angle) * 180 / Math.PI);
       syncStickerInspector(); schedulePreviewNow();
     });

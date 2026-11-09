@@ -1,6 +1,6 @@
 <p align="center"><img src="favicon.svg" width="72" height="72" alt="PhotoFrame logo"></p>
 <h1 align="center">PhotoFrame</h1>
-<p align="center">Film formats, clean borders, camera stickers and photo collages.</p>
+<p align="center">Film formats, clean borders, map overlays, camera stickers and photo collages.</p>
 <p align="center"><a href="README.md">简体中文</a> · English · <a href="#interface-tour">UI tour</a> · <a href="#quick-start">Quick start</a> · <a href="TECHNICAL_SPEC.md">Technical design</a></p>
 
 PhotoFrame is a browser-based photo framing and layout tool. Import photographs, choose a film format, adjust borders and captions, add stickers or arrange a collage, then export JPEG / PNG files or a batch ZIP. Decoding and rendering happen locally; using the editor does not require uploading photographs or creating an account.
@@ -19,6 +19,7 @@ _Actual application UI. The landscapes are generated locally, with no personal p
 | **Borders and backgrounds** | Independent margins, rounded corners, solid / gradient / paper / linen / grain / halftone backgrounds, strokes and shadows, with draggable inner and outer frames |
 | **Captions**                | Available EXIF fields plus manual location and film information; title / subtitle templates, extra text, fonts, alignment, positioning and transforms             |
 | **Stickers**                | 320 built-in entries across 9 category controls: film, vector / cutout cameras and decorations; personal uploads, scale, rotation, opacity, strokes and shadows   |
+| **Map overlays**            | Mountain contours, city streets and waterways. Choose a place by name, coordinates or photo GPS, then customize the pin, fade and background. |
 | **Collages**                | 18 layouts with image slots, canvas ratios, whitespace, gaps, corners, materials, alignment, titles and photo ordering                                            |
 | **Batch editing**           | Up to 72 photographs, a bottom filmstrip with navigation and multi-selection, guided style synchronization, undo / redo, original comparison and ZIP export                                              |
 | **Original-resolution export** | Thumbnail-based editing with full-resolution source rendering by default for single-image and ZIP exports. Borders expand the canvas. |
@@ -76,6 +77,19 @@ Open **调整构图** (Adjust composition) beneath the canvas. Drag to repositio
 ![Darkroom theme with vector camera stickers and a selected Nikon F asset with transform controls](docs/screenshots/sticker-library.webp)
 
 Vector camera illustrations and transparent camera cutouts are separate categories. Photographic assets retain their own source / license links; see [Assets and licenses](#assets-and-licenses).
+
+### Add a map overlay
+
+1. Import a photo and open **贴图 → 地图叠层** (Stickers → Map overlay). Choose mountain contours or city streets and waterways.
+2. Load the built-in Val di Funes or Saint Petersburg sample, search for a place, enter latitude and longitude, or choose **使用照片 GPS** (Use photo GPS). Set the map width and generate the map.
+3. Click the small map to move the red pin. Drag the overlay onto sky or open space in the photo. Map width sets the geographic coverage, while sticker size sets the size on the photo. Coordinates, a scale bar and a north arrow are optional. Mountain maps can also show approximate elevation.
+4. Choose a transparent or custom background with independent opacity. Use dark lines directly on a white border, or pair a dark background with warm white lines for a map card. The lower-edge fade blends the linework into the photo.
+
+![Val di Funes mountain contours over a photo, with map controls](docs/screenshots/terrain-map.webp)
+
+![Saint Petersburg street map on a white photo border, with a custom dark background](docs/screenshots/city-map.webp)
+
+The built-in samples work offline. Searching for new places and loading new areas require internet access. Photo composition and session storage happen locally. Single-image and ZIP exports redraw the map at the output dimensions, and original-resolution mode uses the source photo. See [map data and credits](assets/maps/README.md). [Place search service](https://github.com/komoot/photon)
 
 ### Assemble a collage in one workspace
 
@@ -166,7 +180,7 @@ Run `node scripts/screenshots.cjs` to reproduce the documentation with isolated 
 ## Source layout
 
 - `index.html`, `css/`: entry point and responsive UI.
-- `js/` contains editing state, aspect-ratio presets, the film-stock catalog, rendering, composition and collage tools, stickers, EXIF, local decoding, session storage and export.
+- `js/` contains editing state, aspect-ratio presets, the film-stock catalog, map overlays, rendering, composition and collage tools, stickers, EXIF, local decoding, session storage and export.
 - `assets/`: camera assets and attribution records.
 - `vendor/`: bundled browser dependencies.
 - `docs/screenshots/`: UI captures, a demo source and the real exported example.

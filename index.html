@@ -530,6 +530,86 @@
       <!-- ── Tab: 贴图库 ──────────────────────────────────────────────── -->
       <div class="tab-content" id="tab-stickers" hidden>
         <div class="sticker-library-head"><div><strong>贴图库</strong><small>点击添加到当前照片</small></div><label class="sticker-upload-btn" title="导入 PNG、JPG、WebP 或 SVG"><input id="sticker-upload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden><span>＋ 导入</span></label></div>
+        <button id="terrain-map-open" class="btn btn-outline" type="button" aria-controls="terrain-map-panel" aria-expanded="false">地图叠层</button>
+        <section id="terrain-map-panel" aria-label="地图叠层设置" hidden>
+          <div class="form-group">
+            <label for="terrain-map-mode">地图样式</label>
+            <select id="terrain-map-mode">
+              <option value="terrain">山地 · 等高线</option>
+              <option value="city">城市 · 街道与水系</option>
+            </select>
+          </div>
+          <form id="terrain-map-search-form" class="terrain-map-row">
+            <input id="terrain-map-query" class="sticker-search" type="search" maxlength="120" placeholder="搜山峰、村庄或观景台" aria-label="搜索地图地点">
+            <button class="btn btn-outline" type="submit">搜索</button>
+          </form>
+          <div id="terrain-map-results"></div>
+          <form id="terrain-map-location-form">
+            <div class="form-group">
+              <label for="terrain-map-center">地图中心（纬度, 经度）</label>
+              <input id="terrain-map-center" type="text" maxlength="48" placeholder="46.6440, 11.7220">
+            </div>
+            <div class="terrain-map-row">
+              <select id="terrain-map-range" aria-label="地图宽度">
+                <option value="3">地图宽 3 km</option><option value="6">地图宽 6 km</option>
+                <option value="12" selected>地图宽 12 km</option><option value="24">地图宽 24 km</option>
+              </select>
+              <button class="btn btn-outline" type="submit">生成地图</button>
+            </div>
+          </form>
+          <div class="terrain-map-row">
+            <button id="terrain-map-gps" class="btn btn-outline" type="button">使用照片 GPS</button>
+            <button id="terrain-map-demo" class="btn btn-outline" type="button">试用 Val di Funes</button>
+          </div>
+          <p id="terrain-map-status" class="field-help" aria-live="polite"></p>
+          <div id="terrain-map-style" hidden>
+            <canvas id="terrain-map-preview" width="660" height="440" aria-label="地图预览，点击移动红点"></canvas>
+            <p id="terrain-map-pin" class="field-help" aria-live="polite"></p>
+            <div class="form-group">
+              <label for="terrain-map-label">地图标题</label>
+              <input id="terrain-map-label" type="text" data-map-field="label" maxlength="72">
+            </div>
+            <div class="form-group">
+              <label for="terrain-map-fade">下缘渐隐</label>
+              <input id="terrain-map-fade" type="range" min="0" max="1" step="0.05" data-map-field="fade">
+            </div>
+            <div class="terrain-map-toggles">
+              <label><input type="checkbox" data-map-field="showCoordinates">经纬度</label>
+              <label id="terrain-map-elevation-option"><input type="checkbox" data-map-field="showElevation">海拔</label>
+              <label><input type="checkbox" data-map-field="showScale">比例尺</label>
+              <label><input type="checkbox" data-map-field="showNorth">指北针</label>
+            </div>
+            <div class="terrain-map-appearance">
+              <div class="form-group">
+                <label for="terrain-map-background">地图背景</label>
+                <select id="terrain-map-background" data-map-field="background">
+                  <option value="transparent">透明</option>
+                  <option value="solid">自定义底色</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="terrain-map-ink">地图线色</label>
+                <select id="terrain-map-ink" data-map-field="ink">
+                  <option value="auto">自动</option>
+                  <option value="light">暖白</option>
+                  <option value="dark">深色</option>
+                </select>
+              </div>
+            </div>
+            <div id="terrain-map-background-fields" class="terrain-map-appearance" hidden>
+              <div class="form-group">
+                <label for="terrain-map-color">底色</label>
+                <input id="terrain-map-color" type="color" data-map-field="backgroundColor" value="#263842">
+              </div>
+              <div class="form-group">
+                <label for="terrain-map-bg-opacity">底色不透明度</label>
+                <input id="terrain-map-bg-opacity" type="range" data-map-field="backgroundOpacity" min="0" max="1" step="0.01">
+              </div>
+            </div>
+            <p id="terrain-map-city-credit" class="field-help" hidden>街道与水系来自 <a href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>，地图数据 © OpenMapTiles、© OpenStreetMap contributors。</p>
+            <p id="terrain-map-terrain-credit" class="field-help">高程来自 <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener noreferrer">Mapzen Terrain Tiles</a>（<a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">数据署名</a>），地名搜索由 <a href="https://github.com/komoot/photon" target="_blank" rel="noopener noreferrer">Photon</a> 提供。</p>
+          </div>
+        </section>
         <input id="sticker-search" class="sticker-search" type="search" placeholder="搜索胶片、胶带、印章…" aria-label="搜索贴图">
         <div id="sticker-categories" class="sticker-categories"></div>
         <div id="sticker-tags" class="sticker-tags" hidden></div>
@@ -540,15 +620,17 @@
           <label>大小 <output id="sticker-scale-label">18%</output><input id="sticker-scale" type="range" min="0.04" max="0.70" step="0.01" value="0.18"></label>
           <label>旋转 <output id="sticker-rotation-label">0°</output><input id="sticker-rotation" type="range" min="-180" max="180" step="1" value="0"></label>
           <label>透明度 <output id="sticker-opacity-label">100%</output><input id="sticker-opacity" type="range" min="0.1" max="1" step="0.01" value="1"></label>
-          <div class="sticker-effect-row">
-            <label class="sticker-color-field">描边颜色<input id="sticker-stroke-color" type="color" value="#ffffff" aria-label="贴图描边颜色"></label>
-            <label class="sticker-shadow-switch">阴影<input id="sticker-shadow-enabled" type="checkbox" checked></label>
-            <label class="sticker-color-field">阴影颜色<input id="sticker-shadow-color" type="color" value="#000000" aria-label="贴图阴影颜色"></label>
+          <div id="sticker-image-effects">
+            <div class="sticker-effect-row">
+              <label class="sticker-color-field">描边颜色<input id="sticker-stroke-color" type="color" value="#ffffff" aria-label="贴图描边颜色"></label>
+              <label class="sticker-shadow-switch">阴影<input id="sticker-shadow-enabled" type="checkbox" checked></label>
+              <label class="sticker-color-field">阴影颜色<input id="sticker-shadow-color" type="color" value="#000000" aria-label="贴图阴影颜色"></label>
+            </div>
+            <label>描边粗细 <output id="sticker-stroke-width-label">0%</output><input id="sticker-stroke-width" type="range" min="0" max="0.08" step="0.005" value="0"></label>
+            <label>阴影柔化 <output id="sticker-shadow-blur-label">4%</output><input id="sticker-shadow-blur" type="range" min="0" max="0.16" step="0.005" value="0.035"></label>
+            <label>阴影距离 <output id="sticker-shadow-distance-label">3%</output><input id="sticker-shadow-distance" type="range" min="0" max="0.16" step="0.005" value="0.025"></label>
+            <label>阴影浓度 <output id="sticker-shadow-opacity-label">28%</output><input id="sticker-shadow-opacity" type="range" min="0" max="0.8" step="0.02" value="0.28"></label>
           </div>
-          <label>描边粗细 <output id="sticker-stroke-width-label">0%</output><input id="sticker-stroke-width" type="range" min="0" max="0.08" step="0.005" value="0"></label>
-          <label>阴影柔化 <output id="sticker-shadow-blur-label">4%</output><input id="sticker-shadow-blur" type="range" min="0" max="0.16" step="0.005" value="0.035"></label>
-          <label>阴影距离 <output id="sticker-shadow-distance-label">3%</output><input id="sticker-shadow-distance" type="range" min="0" max="0.16" step="0.005" value="0.025"></label>
-          <label>阴影浓度 <output id="sticker-shadow-opacity-label">28%</output><input id="sticker-shadow-opacity" type="range" min="0" max="0.8" step="0.02" value="0.28"></label>
           <div class="sticker-action-row"><button id="btn-sticker-back" type="button">下移一层</button><button id="btn-sticker-front" type="button">置于顶层</button><button id="btn-sticker-duplicate" type="button">复制</button></div>
           <a id="sticker-attribution" class="sticker-attribution" href="#" target="_blank" rel="noopener noreferrer" hidden>查看照片来源与许可</a>
         </div>
@@ -996,6 +1078,9 @@
 <script src="js/exif-reader.js"></script>
 <script src="js/image-decoder.js"></script>
 <script src="js/photo-orientation.js"></script>
+<script src="js/terrain-map.js"></script>
+<script src="js/city-map.js"></script>
+<script src="js/terrain-map-editor.js"></script>
 <script src="js/canvas-renderer.js"></script>
 <script src="js/crop-editor.js"></script>
 <script src="js/collage-layouts.js"></script>

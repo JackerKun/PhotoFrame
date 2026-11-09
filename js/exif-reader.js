@@ -52,7 +52,7 @@ window.ExifReader = (() => {
       ? formatDate(raw.DateTimeOriginal)
       : (raw.DateTime ? formatDate(raw.DateTime) : '');
 
-    const gps = (raw.latitude && raw.longitude)
+    const gps = (Number.isFinite(raw.latitude) && Number.isFinite(raw.longitude))
       ? { lat: raw.latitude, lng: raw.longitude }
       : null;
 

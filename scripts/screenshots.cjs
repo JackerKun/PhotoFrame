@@ -205,6 +205,29 @@ async function main() {
     await page.locator('#film-frame-remove').click();
     await page.locator('#preset-search').clear();
 
+    await tab('stickers');
+    await page.getByRole('button', { name: '地图叠层', exact: true }).click();
+    await page.getByRole('button', { name: '试用 Val di Funes' }).click();
+    await expect(page.locator('#terrain-map-label')).toHaveValue('Val di Funes');
+    await capture('terrain-map');
+
+    await page.getByLabel('地图样式').selectOption('city');
+    await page.getByRole('button', { name: '试用圣彼得堡' }).click();
+    await expect(page.locator('#terrain-map-label')).toHaveValue('圣彼得堡 · Saint Petersburg');
+    await page.getByLabel('地图背景').selectOption('solid');
+    await page.getByLabel('底色', { exact: true }).fill('#243848');
+    await page.getByLabel('底色不透明度').fill('1');
+    await page.locator('#sticker-scale').fill('0.24');
+    await settle();
+    const previewBox = await page.locator('#canvas-preview').boundingBox();
+    const mapBox = await page.locator('#sticker-transform-handle').boundingBox();
+    await page.mouse.move(mapBox.x + mapBox.width / 2, mapBox.y + mapBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(previewBox.x + previewBox.width * .18, previewBox.y + previewBox.height * .90, { steps: 8 });
+    await page.mouse.up();
+    await capture('city-map');
+    await page.locator('#btn-sticker-delete').click();
+
     await tab('output');
     await page.locator('#output-format').selectOption('jpeg');
     await expect(page.locator('#output-resolution')).toHaveValue('0');

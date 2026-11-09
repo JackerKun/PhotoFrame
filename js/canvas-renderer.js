@@ -66,16 +66,21 @@ window.CanvasRenderer = (() => {
 
   async function drawStickers(ctx, canvasW, canvasH, shorter, job) {
     for (const sticker of job?.stickers || []) {
-      if (!sticker?.src) continue;
+      if (!sticker?.src && !sticker?.terrain) continue;
+      const reference = sticker.terrain ? Math.min(canvasW, canvasH) : shorter;
+      const width = Math.max(1, reference * Math.max(.01, sticker.scale ?? .18));
+      ctx.save();
       try {
-        const img = await loadStickerImage(sticker.src);
-        const ratio = Math.max(.05, sticker.ratio || img.naturalWidth / img.naturalHeight || 1);
-        const width = Math.max(1, shorter * Math.max(.01, sticker.scale ?? .18));
-        const height = width / ratio;
-        ctx.save();
         ctx.translate((sticker.x ?? .5) * canvasW, (sticker.y ?? .5) * canvasH);
         ctx.rotate((sticker.rotation || 0) * Math.PI / 180);
         ctx.globalAlpha = Math.max(.05, Math.min(1, sticker.opacity ?? 1));
+        if (sticker.terrain) {
+          TerrainMap.draw(ctx, sticker.terrain, width);
+          continue;
+        }
+        const img = await loadStickerImage(sticker.src);
+        const ratio = Math.max(.05, sticker.ratio || img.naturalWidth / img.naturalHeight || 1);
+        const height = width / ratio;
         const stroke = Math.max(0, Math.min(.08, sticker.strokeWidth || 0)) * width;
         if (stroke > .25) {
           drawStickerOutline(ctx, img, width, height, stroke, sticker.strokeColor);
@@ -87,9 +92,10 @@ window.CanvasRenderer = (() => {
           ctx.shadowOffsetX = distance * .55; ctx.shadowOffsetY = distance;
         }
         ctx.drawImage(img, -width / 2, -height / 2, width, height);
-        ctx.restore();
       } catch (e) {
         console.warn('[Sticker] render failed', e);
+      } finally {
+        ctx.restore();
       }
     }
   }

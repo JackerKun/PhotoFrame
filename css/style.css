@@ -1840,6 +1840,34 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .sticker-card-remove { position:absolute;right:4px;top:4px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:rgba(20,20,20,.72);color:#fff;font-style:normal;font-size:14px;opacity:0; }
 .sticker-card:hover .sticker-card-remove,.sticker-card:focus .sticker-card-remove { opacity:1; }
 .sticker-empty { padding:30px 0;text-align:center;color:var(--text-3);font-size:12px; }
+#terrain-map-panel, #terrain-map-style, #terrain-map-results, #terrain-map-location-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+.terrain-map-row { display: flex; gap: 6px; align-items: stretch; }
+.terrain-map-row :is(input, select) { flex: 1; min-width: 0; }
+.terrain-map-row button { width: auto; flex-shrink: 0; padding-inline: 10px; }
+#terrain-map-gps, #terrain-map-demo { flex: 1; }
+#terrain-map-results button { text-align: left; white-space: normal; }
+#terrain-map-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  background: #263842;
+  cursor: crosshair;
+}
+#terrain-map-preview[data-ink="dark"] { background: #f5f2e9; }
+.terrain-map-appearance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.terrain-map-toggles { display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 11px; }
+.terrain-map-toggles label { display: inline-flex; align-items: center; gap: 4px; }
+#tab-stickers.terrain-editing :is(.sticker-library-head, #sticker-search, #sticker-categories, #sticker-tags, #sticker-grid, #sticker-empty, .sticker-privacy) {
+  display: none;
+}
+#sticker-image-effects { display: contents; }
+
 .sticker-inspector { margin-top:12px;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--bg-hover);display:grid;gap:10px; }
 .sticker-inspector-title { display:flex;align-items:center;justify-content:space-between;gap:8px; }
 .sticker-inspector-title strong { font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
