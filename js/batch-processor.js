@@ -29,17 +29,7 @@ window.BatchProcessor = (() => {
         if (!preset) continue;
 
         const out = preset.output || {};
-        const canvas = await CanvasRenderer.render(
-          job.file,
-          preset,
-          job,
-          out.longEdge ?? 3000
-        );
-        const blob = await CanvasRenderer.canvasToBlob(
-          canvas,
-          out.format  || 'jpeg',
-          (out.quality || 95) / 100
-        );
+        const blob = await renderBlob(job, preset, out);
 
         const ext  = (out.format || 'jpeg') === 'png' ? 'png' : 'jpg';
         let name = resolveFilename(out.filenameTemplate, job, index + 1, ext);
@@ -77,20 +67,19 @@ window.BatchProcessor = (() => {
    */
   async function exportSingle(job, preset) {
     const out = preset.output || {};
-    const canvas = await CanvasRenderer.render(
-      job.file,
-      preset,
-      job,
-      out.longEdge ?? 3000
-    );
-    const blob = await CanvasRenderer.canvasToBlob(
-      canvas,
-      out.format  || 'jpeg',
-      (out.quality || 95) / 100
-    );
+    const blob = await renderBlob(job, preset, out);
     const ext  = (out.format || 'jpeg') === 'png' ? 'png' : 'jpg';
     const name = resolveFilename(out.filenameTemplate, job, 1, ext);
     saveAs(blob, name);
+  }
+
+  async function renderBlob(job, preset, out) {
+    const canvas = await CanvasRenderer.render(job.file, preset, job, out.longEdge ?? 0);
+    try {
+      return await CanvasRenderer.canvasToBlob(canvas, out.format || 'jpeg', (out.quality || 95) / 100);
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
   }
 
   return { exportZip, exportSingle, resolveFilename };

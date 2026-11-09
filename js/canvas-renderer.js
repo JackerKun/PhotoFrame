@@ -11,24 +11,22 @@ window.CanvasRenderer = (() => {
   let _lastLayout = null;
   function getLastLayout() { return _lastLayout; }
 
-  // ── 加载图片 ──────────────────────────────────────────────────────────────
-  const imageCache = new Map();
+  const previewSources = new Map();
   const stickerImageCache = new Map();
-  const MAX_DECODED_IMAGES = 3;
-  function loadImage(file) {
-    if (imageCache.has(file)) {
-      const cached = imageCache.get(file);
-      // Map 的插入顺序作为轻量 LRU，避免浏览大量照片后一直占用解码内存。
-      imageCache.delete(file);
-      imageCache.set(file, cached);
-      return cached;
-    }
-    const pending = window.ImageDecoder.load(file);
-    imageCache.set(file, pending);
-    while (imageCache.size > MAX_DECODED_IMAGES) {
-      imageCache.delete(imageCache.keys().next().value);
-    }
-    pending.catch(() => imageCache.delete(file));
+
+  function loadPreviewSource(file) {
+    const cached = previewSources.get(file);
+    const pending = cached || window.ImageDecoder.load(file).then(image => ({
+      image: window.ImageDecoder.downsample(image, 1600),
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    }));
+    previewSources.delete(file);
+    previewSources.set(file, pending);
+    if (previewSources.size > 3) previewSources.delete(previewSources.keys().next().value);
+    if (!cached) pending.catch(() => {
+      if (previewSources.get(file) === pending) previewSources.delete(file);
+    });
     return pending;
   }
 
@@ -106,21 +104,25 @@ window.CanvasRenderer = (() => {
   }
 
   // ── 模板变量替换 ──────────────────────────────────────────────────────────
-  function resolveTemplate(tpl, job) {
-    if (!tpl) return '';
+  function resolveTemplate(tpl, job, extra = {}) {
+    if (typeof tpl !== 'string') return '';
     const exif = job.exif || {};
-    const ov   = job.overrides || {};
-    return tpl
-      .replace(/\{location\}/g, ov.location || '')
-      .replace(/\{camera\}/g,   ov.camera   || exif.camera   || '')
-      .replace(/\{film\}/g,     ov.film     || '')
-      .replace(/\{lens\}/g,     ov.lens     || exif.lens     || '')
-      .replace(/\{focal\}/g,    exif.focalLength || '')
-      .replace(/\{aperture\}/g, exif.aperture || '')
-      .replace(/\{shutter\}/g,  exif.shutter  || '')
-      .replace(/\{iso\}/g,      exif.iso ? `ISO ${exif.iso}` : '')
-      .replace(/\{date\}/g,     ov.date || exif.date || '')
-      .trim();
+    const ov = job.overrides || {};
+    const values = {
+      location: ov.location || '',
+      camera: ov.camera || exif.camera || '',
+      film: ov.film || '',
+      lens: ov.lens || exif.lens || '',
+      focal: exif.focalLength || '',
+      aperture: exif.aperture || '',
+      shutter: exif.shutter || '',
+      iso: exif.iso ? `ISO ${exif.iso}` : '',
+      date: ov.date || exif.date || '',
+      ...extra,
+    };
+    return tpl.replace(/\{([a-z]+)\}/g, (token, key) =>
+      Object.hasOwn(values, key) ? values[key] : token
+    ).trim();
   }
 
   // ── 圆角矩形路径 ─────────────────────────────────────────────────────────
@@ -404,59 +406,50 @@ window.CanvasRenderer = (() => {
     return { sx, sy, sw, sh };
   }
 
-  async function render(file, preset, job, outputLongEdge = 0) {
-    const img = await loadImage(file);
-
-    const srcW = img.naturalWidth;
-    const srcH = img.naturalHeight;
-
-    // 是否强制画幅比例（预设默认都开启，极简除外）
-    const enforceRatio = preset.enforcePhotoRatio !== false;
-    let targetRatio  = enforceRatio
-      ? (preset.thumb?.photoRatio ?? (srcW / srcH))
-      : (srcW / srcH);
-
-    // ── 计算照片区域尺寸（输出 canvas 内的照片宽高）──────────────────────
-    const b = effectiveBorder(preset, job);
+  function getComposition(width, height, preset, job, b = effectiveBorder(preset, job)) {
+    const { width: srcW, height: srcH } = PhotoOrientation.size(width, height, job?.orientation);
     const frame = job?.frameLayout;
+    const hasFrame = frame?.canvasW > 0 && frame.canvasH > 0 && frame.photoW > 0 && frame.photoH > 0;
+    const sourceRatio = srcW / srcH;
+    const ownRatio = b.film || job?.cropRect?.useOwnRatio;
+    const enforceRatio = ownRatio || preset.enforcePhotoRatio !== false;
+    const cropRatio = job?.cropRect?.sw / job?.cropRect?.sh;
+    let targetRatio = sourceRatio;
+    if (hasFrame) targetRatio = frame.photoW / frame.photoH;
+    else if (ownRatio) targetRatio = cropRatio || sourceRatio;
+    else if (enforceRatio && (!job?.preserveSourceRatio || job.cropRect)) targetRatio = preset.thumb?.photoRatio ?? sourceRatio;
+    const crop = enforceRatio && (job?.cropRect || Math.abs(targetRatio / sourceRatio - 1) > 0.001)
+      ? adaptCropToRatio(job?.cropRect, srcW, srcH, targetRatio)
+      : { sx: 0, sy: 0, sw: srcW, sh: srcH };
+    return { crop, frame: hasFrame ? frame : null };
+  }
+
+  function calculateLayout(srcW, srcH, preset, job, outputLongEdge) {
+    const b = effectiveBorder(preset, job);
+    const { crop, frame } = getComposition(srcW, srcH, preset, job, b);
+    const targetRatio = crop.sw / crop.sh;
     let photoW, photoH, shorter;
     let bTop, bBottom, bLeft, bRight;
     let canvasW, canvasH;
 
-    if (frame && frame.canvasW > 0 && frame.canvasH > 0 && frame.photoW > 0 && frame.photoH > 0) {
-      // 专业边框模式：画布和照片使用两个独立矩形。调整内框不会改变外画布。
-      const desiredLong = outputLongEdge > 0 ? outputLongEdge : Math.max(srcW, srcH);
-      // 保持既有“照片长边”分辨率语义；内框变化不会导致外画布在松手后跳变。
+    if (frame) {
+      // 固定尺寸按编辑基准缩放；原始分辨率按当前照片区域保留像素密度。
       const referenceLong = frame.referencePhotoLong || Math.max(frame.photoW, frame.photoH);
-      const scale = desiredLong / referenceLong;
-      canvasW = Math.max(1, Math.round(frame.canvasW * scale));
-      canvasH = Math.max(1, Math.round(frame.canvasH * scale));
-      bLeft   = Math.max(0, Math.round(frame.photoX * scale));
-      bTop    = Math.max(0, Math.round(frame.photoY * scale));
-      photoW  = Math.max(1, Math.round(frame.photoW * scale));
-      photoH  = Math.max(1, Math.round(frame.photoH * scale));
-      bRight  = Math.max(0, canvasW - bLeft - photoW);
-      bBottom = Math.max(0, canvasH - bTop - photoH);
+      const scale = outputLongEdge > 0 ? outputLongEdge / referenceLong
+        : Math.max(crop.sw / frame.photoW, crop.sh / frame.photoH);
+      bLeft  = Math.max(0, Math.round(frame.photoX * scale));
+      bTop   = Math.max(0, Math.round(frame.photoY * scale));
+      photoW = Math.max(1, Math.round(frame.photoW * scale));
+      photoH = Math.max(1, Math.round(frame.photoH * scale));
+      canvasW = Math.max(bLeft + photoW, Math.round(frame.canvasW * scale));
+      canvasH = Math.max(bTop + photoH, Math.round(frame.canvasH * scale));
+      bRight  = canvasW - bLeft - photoW;
+      bBottom = canvasH - bTop - photoH;
       shorter = Math.min(photoW, photoH);
-      targetRatio = photoW / photoH;
     } else {
-      if (outputLongEdge > 0) {
-        if (targetRatio >= 1) {
-          photoW = outputLongEdge;
-          photoH = Math.round(outputLongEdge / targetRatio);
-        } else {
-          photoH = outputLongEdge;
-          photoW = Math.round(outputLongEdge * targetRatio);
-        }
-      } else {
-        if (targetRatio >= 1) {
-          photoW = Math.max(srcW, srcH);
-          photoH = Math.round(photoW / targetRatio);
-        } else {
-          photoH = Math.max(srcW, srcH);
-          photoW = Math.round(photoH * targetRatio);
-        }
-      }
+      const longEdge = outputLongEdge || Math.max(crop.sw, crop.sh);
+      photoW = Math.max(1, Math.round(longEdge * Math.min(1, targetRatio)));
+      photoH = Math.max(1, Math.round(longEdge * Math.min(1, 1 / targetRatio)));
 
       shorter = Math.min(photoW, photoH);
       bTop    = Math.round(shorter * (b.top    ?? 0.05));
@@ -466,10 +459,17 @@ window.CanvasRenderer = (() => {
       canvasW = photoW + bLeft + bRight;
       canvasH = photoH + bTop  + bBottom;
     }
-    const radius = Math.round(shorter * (b.radius ?? 0));
 
-    // If preset specifies a target canvas aspect ratio, expand borders to fill
-    if (!frame && preset.targetCanvasAspect) {
+    const filmPortrait = targetRatio < 1;
+    if (b.film) {
+      const padding = FilmFrame.padding(b.film, shorter, filmPortrait);
+      bTop = frame ? Math.max(bTop, padding.top) : padding.top;
+      bBottom = frame ? Math.max(bBottom, padding.bottom) : padding.bottom;
+      bLeft = frame ? Math.max(bLeft, padding.left) : padding.left;
+      bRight = frame ? Math.max(bRight, padding.right) : padding.right;
+      canvasW = bLeft + photoW + bRight;
+      canvasH = bTop + photoH + bBottom;
+    } else if (!frame && preset.targetCanvasAspect) {
       const targetAspect = preset.targetCanvasAspect; // W / H
       const currentAspect = canvasW / canvasH;
       if (currentAspect > targetAspect) {
@@ -489,18 +489,33 @@ window.CanvasRenderer = (() => {
       }
     }
 
-    // 保存布局信息供外部使用（文字拖拽定位）
-    _lastLayout = { canvasW, canvasH, bTop, bBottom, bLeft, bRight, photoW, photoH, shorter };
+    return { canvasW, canvasH, bTop, bBottom, bLeft, bRight, photoW, photoH, shorter, crop, filmPortrait };
+  }
 
+  async function renderImage(image, source, preset, job, layout) {
+    const { canvasW, canvasH, bTop, bBottom, bLeft, photoW, photoH, shorter, crop } = layout;
+    const b = effectiveBorder(preset, job);
+    const radius = Math.round(shorter * (b.radius ?? 0));
     const canvas = document.createElement('canvas');
-    canvas.width  = canvasW;
+    canvas.width = canvasW;
     canvas.height = canvasH;
     const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+    if (!ctx) throw new Error(`浏览器无法创建 ${canvasW} × ${canvasH} 像素的画布`);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
     // 背景：纯色、渐变或程序化纹理
-    paintCanvasBackground(ctx, canvasW, canvasH, b);
+    if (b.film) {
+      const film = b.film;
+      const values = {
+        stock: FilmStocks.get(film.stockId)?.name || 'FILM FRAME',
+        format: film.format === '120' ? '120' : '135',
+        frame: typeof film.frame === 'string' ? film.frame : '',
+      };
+      FilmFrame.draw(ctx, layout, film, label => resolveTemplate(label, job, values), paintCanvasBackground);
+    } else {
+      paintCanvasBackground(ctx, canvasW, canvasH, b);
+    }
 
     const shadowOpacity = Math.max(0, Math.min(1, b.photoShadowOpacity || 0));
     if (shadowOpacity > 0) {
@@ -519,16 +534,7 @@ window.CanvasRenderer = (() => {
       ctx.clip();
     }
 
-    if (enforceRatio) {
-      // 使用用户调整的裁切框，或自动居中
-      const crop = adaptCropToRatio(job && job.cropRect, srcW, srcH, targetRatio);
-      ctx.drawImage(img,
-        crop.sx, crop.sy, crop.sw, crop.sh,  // 源区域
-        bLeft,   bTop,    photoW,  photoH    // 目标区域
-      );
-    } else {
-      ctx.drawImage(img, bLeft, bTop, photoW, photoH);
-    }
+    PhotoOrientation.draw(ctx, image, source, job.orientation, crop, bLeft, bTop, photoW, photoH);
 
     if (radius > 0) ctx.restore();
 
@@ -545,10 +551,8 @@ window.CanvasRenderer = (() => {
 
     // 信息文字
     const info = effectiveInfo(preset, job);
-    if (info.enabled !== false) {
-      const layout = { canvasW, canvasH, bTop, bBottom, photoH, shorter };
+    if (!b.film && info.enabled !== false) {
       await drawInfoBar(ctx, layout, info, job);
-      _lastLayout.textBounds = layout.textBounds || null;
     }
 
     await drawStickers(ctx, canvasW, canvasH, shorter, job);
@@ -556,10 +560,22 @@ window.CanvasRenderer = (() => {
     return canvas;
   }
 
-  // ── 快速预览渲染（低分辨率） ──────────────────────────────────────────────
-  async function renderPreview(file, preset, job, maxLongEdge = 1200) {
-    return render(file, preset, job, maxLongEdge);
+  async function render(file, preset, job, outputLongEdge = 0) {
+    const image = await window.ImageDecoder.load(file);
+    const source = { width: image.naturalWidth, height: image.naturalHeight };
+    const layout = calculateLayout(source.width, source.height, preset, job, outputLongEdge);
+    return renderImage(image, source, preset, job, layout);
   }
+
+  async function renderPreview(file, preset, job, maxLongEdge = 1200) {
+    const source = await loadPreviewSource(file);
+    const layout = calculateLayout(source.width, source.height, preset, job, maxLongEdge);
+    const outputLayout = calculateLayout(source.width, source.height, preset, job, preset.output?.longEdge ?? 0);
+    const canvas = await renderImage(source.image, source, preset, job, layout);
+    return { canvas, layout, outputLayout };
+  }
+
+  function setLastLayout(layout) { _lastLayout = layout; }
 
   // ── Canvas → Blob ─────────────────────────────────────────────────────────
   function canvasToBlob(canvas, format = 'jpeg', quality = 0.95) {
@@ -579,5 +595,5 @@ window.CanvasRenderer = (() => {
     return canvas.toDataURL(mimeType, quality);
   }
 
-  return { render, renderPreview, canvasToBlob, canvasToDataURL, resolveTemplate, calculateAutoCrop, getLastLayout, paintCanvasBackground };
+  return { render, renderPreview, canvasToBlob, canvasToDataURL, resolveTemplate, calculateAutoCrop, getComposition, getLastLayout, setLastLayout, loadPreviewSource, paintCanvasBackground };
 })();

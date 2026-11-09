@@ -335,10 +335,6 @@ window.COLLAGE_LAYOUTS.forEach(l => {
 // ══════════════════════════════════════════════════════════════════════════
 window.CollageRenderer = (() => {
 
-  function loadImage(file) {
-    return window.ImageDecoder.load(file);
-  }
-
   function autoCrop(imgW, imgH, targetRatio) {
     const imgR = imgW / imgH;
     let sw, sh;
@@ -350,13 +346,13 @@ window.CollageRenderer = (() => {
   /**
    * 渲染拼图
    * @param {Object}   layout       COLLAGE_LAYOUTS 中的一项
-   * @param {Array}    cells        [{file, cropRect, imgCache?}, ...] 与 layout.cells 等长
+   * @param {Array}    cells        [{file, cropRect}, ...] 与 layout.cells 等长
    * @param {Object}   infoOverride 可覆盖 layout.infoBar 的字段
    * @param {number}   outputLongEdge
    * @param {Object}   borderOverride
    * @returns {Promise<HTMLCanvasElement>}
    */
-  async function render(layout, cells, infoOverride = {}, outputLongEdge = 3000, borderOverride = {}) {
+  async function render(layout, cells, infoOverride = {}, outputLongEdge = 3000, borderOverride = {}, preview = false) {
     const b = Object.assign({}, layout.border, borderOverride);
     const customRatio = Number(b.canvasRatio);
     const ratio = Number.isFinite(customRatio) && customRatio > 0 ? customRatio : (layout.outputRatio || 1);
@@ -402,7 +398,12 @@ window.CollageRenderer = (() => {
       const cellData = cells[i];
       if (!cellData?.file) continue;
 
-      const img = cellData.imgCache || await loadImage(cellData.file);
+      const source = preview ? await CanvasRenderer.loadPreviewSource(cellData.file) : null;
+      const img = source?.image || await ImageDecoder.load(cellData.file);
+      const srcW = source?.width ?? img.naturalWidth;
+      const srcH = source?.height ?? img.naturalHeight;
+      const scaleX = source ? img.width / srcW : 1;
+      const scaleY = source ? img.height / srcH : 1;
 
       const gap = Math.round(shorter * (b.cellGap || 0));
       const cellX = Math.round(paX + cellDef.x * paW) + gap / 2;
@@ -412,7 +413,7 @@ window.CollageRenderer = (() => {
       const cellRadius = Math.max(0, shorter * (b.cellRadius || 0));
 
       const cellRatio = cellW / cellH;
-      const crop = cellData.cropRect || autoCrop(img.naturalWidth, img.naturalHeight, cellRatio);
+      const crop = cellData.cropRect || autoCrop(srcW, srcH, cellRatio);
 
       ctx.save();
       if (b.cellShadow) {
@@ -423,7 +424,7 @@ window.CollageRenderer = (() => {
       ctx.beginPath();
       roundCell(ctx, cellX, cellY, cellW, cellH, cellRadius);
       ctx.clip();
-      ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, cellX, cellY, cellW, cellH);
+      ctx.drawImage(img, crop.sx * scaleX, crop.sy * scaleY, crop.sw * scaleX, crop.sh * scaleY, cellX, cellY, cellW, cellH);
       ctx.restore();
       const stroke = Math.max(0, shorter * (b.cellStroke || 0));
       if (stroke) { ctx.save(); ctx.strokeStyle = b.cellStrokeColor || '#fff'; ctx.lineWidth = stroke; roundCell(ctx, cellX + stroke / 2, cellY + stroke / 2, cellW - stroke, cellH - stroke, Math.max(0, cellRadius - stroke / 2)); ctx.stroke(); ctx.restore(); }
@@ -472,7 +473,7 @@ window.CollageRenderer = (() => {
 
   /** 快速预览（低分辨率） */
   async function renderPreview(layout, cells, infoOverride, borderOverride, maxEdge = 1200) {
-    return render(layout, cells, infoOverride, maxEdge, borderOverride);
+    return render(layout, cells, infoOverride, maxEdge, borderOverride, true);
   }
 
   return { render, renderPreview };

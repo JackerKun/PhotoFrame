@@ -1,10 +1,10 @@
-const CACHE = 'photoframe-v22';
+const CACHE = 'photoframe-v25';
 const ASSETS = [
   './', './index.html', './css/style.css', './favicon.svg', './manifest.webmanifest',
   './vendor/exifr-lite.umd.js', './vendor/jszip.min.js', './vendor/FileSaver.min.js',
   './vendor/heic2any.min.js', './vendor/UTIF.js',
-  './js/presets.js', './js/exif-reader.js', './js/image-decoder.js',
-  './js/canvas-renderer.js', './js/crop-editor.js', './js/collage-layouts.js', './js/camera-cutout-library.js', './js/sticker-library.js',
+  './js/presets.js', './js/film-stocks.js', './js/film-frame.js', './js/exif-reader.js', './js/image-decoder.js',
+  './js/photo-orientation.js', './js/canvas-renderer.js', './js/crop-editor.js', './js/collage-layouts.js', './js/camera-cutout-library.js', './js/sticker-library.js',
   './js/storage.js', './js/session-store.js', './js/batch-processor.js', './js/app.js'
 ];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));

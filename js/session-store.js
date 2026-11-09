@@ -89,13 +89,12 @@ window.SessionStore = (() => {
    */
   async function saveFile(id, file) {
     await open();
-    const buf = await file.arrayBuffer();
     await idbPut('files', {
       id,
       name:         file.name,
       type:         file.type,
       lastModified: file.lastModified,
-      buf,
+      blob:         file,
     });
   }
 
@@ -145,7 +144,7 @@ window.SessionStore = (() => {
     // 重建 File 对象
     const fileMap = {};
     for (const rec of fileRecords) {
-      fileMap[rec.id] = new File([rec.buf], rec.name, {
+      fileMap[rec.id] = new File([rec.blob ?? rec.buf], rec.name, {
         type:         rec.type,
         lastModified: rec.lastModified,
       });

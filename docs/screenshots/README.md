@@ -4,13 +4,14 @@ Real browser UI from version 1.0.0, with four generated landscapes and manually 
 
 | Asset                  | Content                                                      |
 | ---------------------- | ------------------------------------------------------------ |
-| `workspace.webp`       | Presets, filmstrip and framed preview                        |
+| `workspace.webp`       | Presets, bottom filmstrip and framed preview                        |
+| `film-frame.webp`      | 135 film border, stock search and custom edge lettering       |
 | `border-editor.webp`   | Warm-paper theme, materials and frame handles                |
 | `sticker-library.webp` | Darkroom theme and vector Nikon F sticker                    |
-| `crop-editor.webp`     | XPan crop workspace                                          |
+| `crop-editor.webp`     | XPan crop, rotation and flip controls                                          |
 | `batch-sync.webp`      | Guided style synchronization                                 |
 | `collage.webp`         | Styled four-image collage                                    |
-| `export.webp`          | JPEG / PNG export settings                                   |
+| `export.webp`          | JPEG / PNG export with original resolution selected                                   |
 | `mobile-editor.webp`   | 390 × 844 mobile preview                                     |
 | `mobile-tools.webp`    | Mobile border / font bottom sheet                            |
 | `demo-photo.jpg`       | Generated source image for visitors to try                   |

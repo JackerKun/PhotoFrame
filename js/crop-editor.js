@@ -16,15 +16,18 @@
 class CropEditor {
   /**
    * @param {HTMLCanvasElement} canvas
-   * @param {HTMLImageElement}  img
+   * @param {CanvasImageSource}  img
    * @param {number}            targetRatio  宽/高，如 1.5 表示 3:2
    * @param {number}            dpr          devicePixelRatio，用于 HiDPI 渲染
+   * @param {Object}            options      原图尺寸和已保存的方向
    */
-  constructor(canvas, img, targetRatio, dpr = 1) {
+  constructor(canvas, img, targetRatio, dpr = 1, options = {}) {
     this.canvas = canvas;
     this.ctx    = canvas.getContext('2d');
     this.img    = img;
-    this.targetRatio = targetRatio || (img.naturalWidth / img.naturalHeight);
+    this.source = { width: options.width ?? img.naturalWidth, height: options.height ?? img.naturalHeight };
+    this.orientation = options.orientation || null;
+    this.targetRatio = targetRatio || (this.size.width / this.size.height);
     this.dpr    = dpr;
 
     this.frameX = 0; this.frameY = 0;
@@ -49,6 +52,10 @@ class CropEditor {
     this._draw();
   }
 
+  get size() {
+    return PhotoOrientation.size(this.source.width, this.source.height, this.orientation);
+  }
+
   // ── 初始化帧框与最小缩放 ─────────────────────────────────────────────────
   _setupFrame() {
     const W = this.canvas.width  / this.dpr;
@@ -69,8 +76,9 @@ class CropEditor {
     this.frameY = (H - this.frameH) / 2;
 
     // 最小缩放 = 恰好覆盖帧框（contain/cover 选 cover）
-    const scaleByW = this.frameW / this.img.naturalWidth;
-    const scaleByH = this.frameH / this.img.naturalHeight;
+    const { width, height } = this.size;
+    const scaleByW = this.frameW / width;
+    const scaleByH = this.frameH / height;
     this.minScale  = Math.max(scaleByW, scaleByH);
 
     this.photoScale = this.minScale;
@@ -94,16 +102,18 @@ class CropEditor {
   }
 
   _centerPhoto() {
-    const pW = this.img.naturalWidth  * this.photoScale;
-    const pH = this.img.naturalHeight * this.photoScale;
+    const { width, height } = this.size;
+    const pW = width * this.photoScale;
+    const pH = height * this.photoScale;
     this.photoX = this.frameX + (this.frameW - pW) / 2;
     this.photoY = this.frameY + (this.frameH - pH) / 2;
   }
 
   // ── 边界约束（保证帧框始终被照片覆盖）──────────────────────────────────
   _clamp() {
-    const pW = this.img.naturalWidth  * this.photoScale;
-    const pH = this.img.naturalHeight * this.photoScale;
+    const { width, height } = this.size;
+    const pW = width * this.photoScale;
+    const pH = height * this.photoScale;
     const minX = this.frameX + this.frameW - pW;
     const minY = this.frameY + this.frameH - pH;
     const maxX = this.frameX;
@@ -232,8 +242,9 @@ class CropEditor {
     this.frameH = fh;
 
     // 重新计算 minScale 并约束 photo
-    const scaleByW = this.frameW / this.img.naturalWidth;
-    const scaleByH = this.frameH / this.img.naturalHeight;
+    const { width, height } = this.size;
+    const scaleByW = this.frameW / width;
+    const scaleByH = this.frameH / height;
     this.minScale = Math.max(scaleByW, scaleByH);
 
     if (this.photoScale < this.minScale) {
@@ -276,18 +287,25 @@ class CropEditor {
     this._schedDraw();
   }
 
-  /** 获取源图裁切矩形（像素坐标） */
+  /** 获取当前方向下的裁切矩形（原图像素） */
   getCropData() {
-    const sx = (this.frameX - this.photoX) / this.photoScale;
-    const sy = (this.frameY - this.photoY) / this.photoScale;
-    const sw = this.frameW / this.photoScale;
-    const sh = this.frameH / this.photoScale;
+    const { width, height } = this.size;
+    const sx = Math.max(0, Math.min(width - 1, Math.round((this.frameX - this.photoX) / this.photoScale)));
+    const sy = Math.max(0, Math.min(height - 1, Math.round((this.frameY - this.photoY) / this.photoScale)));
     return {
-      sx: Math.max(0, Math.round(sx)),
-      sy: Math.max(0, Math.round(sy)),
-      sw: Math.min(this.img.naturalWidth,  Math.round(sw)),
-      sh: Math.min(this.img.naturalHeight, Math.round(sh)),
+      sx, sy,
+      sw: Math.max(1, Math.min(width - sx, Math.round(this.frameW / this.photoScale))),
+      sh: Math.max(1, Math.min(height - sy, Math.round(this.frameH / this.photoScale))),
     };
+  }
+
+  transform(action) {
+    const { width, height } = this.size;
+    const crop = PhotoOrientation.changeCrop(this.getCropData(), width, height, action);
+    this.orientation = PhotoOrientation.change(this.orientation, action);
+    this.targetRatio = crop.sw / crop.sh;
+    this._setupFrame();
+    this.setFromCropRect(crop);
   }
 
   /** 从已保存的裁切矩形恢复状态 */
@@ -324,8 +342,9 @@ class CropEditor {
     const dpr  = this.dpr;
     const W    = this.canvas.width;
     const H    = this.canvas.height;
-    const pW   = this.img.naturalWidth  * this.photoScale * dpr;
-    const pH   = this.img.naturalHeight * this.photoScale * dpr;
+    const { width, height } = this.size;
+    const pW   = width * this.photoScale * dpr;
+    const pH   = height * this.photoScale * dpr;
     const pX   = this.photoX * dpr;
     const pY   = this.photoY * dpr;
     const fX   = this.frameX * dpr;
@@ -341,7 +360,7 @@ class CropEditor {
 
     // ① 画暗化版照片（帧框外）
     ctx.globalAlpha = 0.32;
-    ctx.drawImage(this.img, pX, pY, pW, pH);
+    PhotoOrientation.draw(ctx, this.img, this.source, this.orientation, null, pX, pY, pW, pH);
     ctx.globalAlpha = 1;
 
     // ② 帧框内画亮照片
@@ -349,7 +368,7 @@ class CropEditor {
     ctx.beginPath();
     ctx.rect(fX, fY, fW, fH);
     ctx.clip();
-    ctx.drawImage(this.img, pX, pY, pW, pH);
+    PhotoOrientation.draw(ctx, this.img, this.source, this.orientation, null, pX, pY, pW, pH);
     ctx.restore();
 
     // ③ 帧框边线

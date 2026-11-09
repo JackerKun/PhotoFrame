@@ -198,11 +198,19 @@ async function main() {
       console.log('Captured', name, bytes.length);
     }
     await capture('workspace');
+    await page.locator('#preset-search').fill('Portra 400');
+    await page.locator('[data-stock="kodak-portra-400"]').click();
+    await page.locator('#film-frame-edge-b').fill('{format}   {camera}   {date}');
+    await capture('film-frame');
+    await page.locator('#film-frame-remove').click();
+    await page.locator('#preset-search').clear();
+
     await tab('output');
     await page.locator('#output-format').selectOption('jpeg');
+    await expect(page.locator('#output-resolution')).toHaveValue('0');
+    await capture('export');
     await page.locator('#output-resolution').selectOption('2400');
     await settle();
-    await capture('export');
     const downloading = page.waitForEvent('download');
     await page.locator('#btn-export-single').click();
     const download = await downloading;

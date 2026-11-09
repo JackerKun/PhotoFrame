@@ -23,7 +23,7 @@ window.ImageDecoder = (() => {
     }
 
     converted.set(file, promise);
-    promise.catch(() => converted.delete(file));
+    promise.then(() => converted.delete(file), () => converted.delete(file));
     return promise;
   }
 
@@ -48,7 +48,11 @@ window.ImageDecoder = (() => {
     const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
     ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), canvas.width, canvas.height), 0, 0);
     return new Promise((resolve, reject) => canvas.toBlob(
-      blob => blob ? resolve(blob) : reject(new Error('TIFF 转换失败')),
+      blob => {
+        canvas.width = canvas.height = 0;
+        if (blob) resolve(blob);
+        else reject(new Error('TIFF 转换失败'));
+      },
       'image/png'
     ));
   }
@@ -64,5 +68,16 @@ window.ImageDecoder = (() => {
     });
   }
 
-  return { load, toRenderableBlob };
+  function downsample(image, longEdge) {
+    const scale = Math.min(1, longEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  return { load, toRenderableBlob, downsample };
 })();

@@ -14,11 +14,14 @@ _Actual application UI. The landscapes are generated locally, with no personal p
 | Area                        | Capabilities                                                                                                                                                      |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Formats and presets**     | 30 single-image presets covering 135, 120 formats, XPan, 612 / 617, social and print layouts; search, favorites, recent presets and aspect-ratio recommendations  |
+| **Film borders**            | 133 film stocks, including 85 with a 120 edition. Search names and aliases, filter by format and film type, and customize edge lettering with EXIF variables. |
+| **Composition**             | Crop, rotate 90° left or right, and flip horizontally or vertically. The crop follows the photograph. |
 | **Borders and backgrounds** | Independent margins, rounded corners, solid / gradient / paper / linen / grain / halftone backgrounds, strokes and shadows, with draggable inner and outer frames |
 | **Captions**                | Available EXIF fields plus manual location and film information; title / subtitle templates, extra text, fonts, alignment, positioning and transforms             |
 | **Stickers**                | 320 built-in entries across 9 category controls: film, vector / cutout cameras and decorations; personal uploads, scale, rotation, opacity, strokes and shadows   |
 | **Collages**                | 18 layouts with image slots, canvas ratios, whitespace, gaps, corners, materials, alignment, titles and photo ordering                                            |
-| **Batch editing**           | Up to 50 photographs, multi-selection, guided style synchronization, undo / redo, original comparison and ZIP export                                              |
+| **Batch editing**           | Up to 72 photographs, a bottom filmstrip with navigation and multi-selection, guided style synchronization, undo / redo, original comparison and ZIP export                                              |
+| **Original-resolution export** | Thumbnail-based editing with full-resolution source rendering by default for single-image and ZIP exports. Borders expand the canvas. |
 | **Local workspace**         | Four UI themes, mobile bottom-sheet controls, local session recovery and preset JSON backup / restore                                                             |
 
 Counts refer to the current `1.0.0` data. EXIF availability depends on the source file; film stock and location usually need manual entry.
@@ -36,30 +39,35 @@ python3 -m http.server 8080 --bind 127.0.0.1
 Open **http://127.0.0.1:8080**. On Windows, use `py -m http.server 8080 --bind 127.0.0.1` if `python3` is unavailable. Use a local HTTP server so asset loading and the service worker can work correctly.
 
 1. Import your photographs, or download the [synthetic demo source](docs/screenshots/demo-photo.jpg).
-2. Choose a format under **预设** (Presets). Fill location, camera, film and date under **信息** (Information).
-3. Adjust **边框&字体** (Borders & fonts), **贴图** (Stickers) and the canvas controls.
-4. Choose format, quality and resolution under **导出** (Export), then save from the top toolbar.
+2. Each photo starts with the closest aspect-ratio preset and its full image intact. Use **预设** (Presets) to choose a different format or a film border.
+3. Switch photos in the bottom filmstrip. Open **调整构图** (Adjust composition) to crop, rotate or flip. Use **信息** (Information) to add location or film details.
+4. Choose JPEG or PNG under **导出** (Export). The default uses the original resolution. Save one image or a ZIP from the top toolbar.
 
 JPEG / PNG / TIFF / HEIC / HEIF decoding is local. Exact compatibility depends on the file encoding and browser memory. The demo source contains no real shooting EXIF.
 
 ## Interface tour
 
-The following images show real operations with four generated demo images, on desktop and a 390-pixel-wide mobile viewport. Screenshots use compressed WebP; click for a larger view.
+These screenshots use four synthetic demo images on desktop and in a 390-pixel-wide mobile viewport. Click a WebP screenshot for a larger view.
+
+### Add a film border
+
+Open **预设 → 胶片边框** (Presets → Film borders) and filter by 135 or 120, color or black-and-white negative, reversal, or motion picture negative. The main search under **全部** (All) also finds names and aliases such as `Fuji`, `Fuji Provia`, and `Portra 400`. The simulated 135 border has sprocket holes, while the 120 border has continuous edges. Both formats offer dark film base, light scan, and cinema scan styles.
+
+Edit either edge with plain text and variables such as `{stock} · {frame} · {camera} · {shutter} · {iso}`. Available EXIF values are printed on the border. Use **使用自定义边字** (Use custom edge text) for an unlisted stock, then save the style as a custom preset if desired.
+
+![Dark 135 film border with simulated sprocket holes, Portra 400 and custom edge lettering](docs/screenshots/film-frame.webp)
+
+### Adjust composition
+
+Open **调整构图** (Adjust composition) beneath the canvas. Drag to reposition the crop, scroll or pinch to zoom, or nudge with the arrow keys. Rotate 90° left or right, or flip horizontally or vertically. The crop follows the transformation. Choose **完成构图** (Finish composition) to apply it to the preview and export.
+
+![XPan composition editor showing the crop, rotate and flip controls](docs/screenshots/crop-editor.webp)
 
 ### Edit borders directly on the canvas
 
 **Open:** import → **边框&字体**. Adjust margins and background, then choose **调整边框** (Adjust borders) below the preview. Drag corner / edge handles. **文字工具** (Text tool) lets you reposition caption blocks.
 
 ![Warm-paper theme with background controls, independent margins and inner / outer frame handles](docs/screenshots/border-editor.webp)
-
-<details>
-<summary>Crop composition: pan, zoom and position the frame</summary>
-
-**Open:** select a format → **调整构图** (Adjust composition). Drag the image, zoom with the wheel or nudge with arrow keys, then choose **完成裁切** (Finish crop). This example uses an XPan format.
-
-![XPan crop editor showing the source image, crop frame, mask and confirmation controls](docs/screenshots/crop-editor.webp)
-
-</details>
 
 ### Add film, camera and personal stickers
 
@@ -87,7 +95,7 @@ Vector camera illustrations and transparent camera cutouts are separate categori
 <details>
 <summary>Export: JPEG / PNG, quality, resolution and filename templates</summary>
 
-**Open:** **导出**. JPEG quality ranges from 70–100%. Photo long-edge options are 1500 / 2400 / 3000 / 4500 / 6000 pixels or the original size. Use filename variables such as `{name}` and `{index}`, then save one image or a batch ZIP. See the sizing notes below.
+**Open:** **导出**. JPEG quality ranges from 70–100%. Export uses the original resolution by default. You can manually set the photo long edge to 1500 / 2400 / 3000 / 4500 / 6000 pixels. Use filename variables such as `{name}` and `{index}`, then save one image or a batch ZIP. See the sizing notes below.
 
 ![Export panel with file format, JPEG quality, long-edge choices, filename template and save controls](docs/screenshots/export.webp)
 
@@ -119,7 +127,7 @@ This WebP is converted from a real JPEG export for documentation. Download the [
 
 1. Import the set and finish the first sample image.
 2. Choose the sync tool and a target range. Recommended options preserve each image's information and crop.
-3. Use the filmstrip to inspect images. `Ctrl / ⌘` toggles selected targets; `Shift` selects a continuous range without changing the current sample.
+3. Scroll the bottom filmstrip or use its previous and next buttons. When the filmstrip has focus, use ← / →. Use `Ctrl / ⌘` to toggle sync targets or `Shift` to select a range.
 4. Refine individual captions and composition, then export a ZIP.
 
 Save a style using **将当前参数保存为预设**. Export a preset JSON backup before switching devices or clearing browser storage, then import it to restore the presets.
@@ -130,8 +138,8 @@ Title / subtitle variables include `{location}`, `{camera}`, `{film}`, `{date}`,
 
 | Question                                       | Behavior                                                                                                                                                                                                                                                      |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Why is the export larger than 2400 pixels?** | Single-image resolution refers to the photo area's long edge; borders enlarge the final canvas. The current export-panel summary may also understate the actual dimensions. Use the exported file's pixel dimensions.                                         |
-| **Does original size include borders?**        | It uses the original photo long edge as the layout reference; borders still enlarge the canvas. The output is re-encoded.                                                                                                                                     |
+| **Why is the export larger than 2400 pixels?** | Single-image resolution refers to the photo area's long edge; borders enlarge the final canvas.                                         |
+| **Does original size include borders?**        | Original-resolution export renders from the source file. The full photo keeps its pixel dimensions and the border expands the canvas. After manual cropping, the retained area determines the size.                                                                                                                                     |
 | **What happens to metadata?**                  | Canvas exports do not copy the source EXIF / GPS. Visible caption text remains. The source file is not overwritten.                                                                                                                                           |
 | **Does it work offline?**                      | A local HTTP server uses bundled resources without an external connection. For remote hosting, load and refresh first so the service worker can take control. Only previously cached resources are available offline; on-demand assets must be visited first. |
 | **Where did my previous session go?**          | Session files use IndexedDB for the current browser and origin; presets / preferences use localStorage. Changing ports, browsers, private mode or clearing site data affects restoration.                                                                     |
@@ -158,7 +166,7 @@ Run `node scripts/screenshots.cjs` to reproduce the documentation with isolated 
 ## Source layout
 
 - `index.html`, `css/`: entry point and responsive UI.
-- `js/`: editing state, presets, rendering, crop / collage tools, stickers, EXIF, local decoding, session storage and export.
+- `js/` contains editing state, aspect-ratio presets, the film-stock catalog, rendering, composition and collage tools, stickers, EXIF, local decoding, session storage and export.
 - `assets/`: camera assets and attribution records.
 - `vendor/`: bundled browser dependencies.
 - `docs/screenshots/`: UI captures, a demo source and the real exported example.

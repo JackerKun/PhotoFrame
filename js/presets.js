@@ -645,6 +645,7 @@ window.PRESET_CATEGORIES = [
   { id: 'social', label: '社交媒体' },
   { id: 'print',  label: '冲印尺寸' },
   { id: 'film',    label: '特定胶卷' },
+  { id: 'film-frame', label: '胶片边框' },
   { id: 'collage', label: '拼图' },
   { id: 'custom',  label: '自定义' },
 ];

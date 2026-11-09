@@ -6,6 +6,7 @@
 
   // 文字位置拖拽范围（相对画布宽度的比例）
   const TEXT_POS_MAX = 0.35;
+  const MAX_PHOTOS = 72;
 
   // ══════════════════════════════════════════════════════════════════════════
   // 状态
@@ -19,7 +20,7 @@
     activeTab: 'presets',
     activeCategory: 'all',
     isRendering: false,
-    exportLongEdge: 3000,
+    exportLongEdge: 0,
     exportFormat: 'jpeg',
     exportQuality: 95,
     cropMode: false,      // 普通单图裁切模式
@@ -65,15 +66,9 @@
   let cropHistorySnapshot = null;
   let collagePreviewDebounce = null;
 
-  // 图片元素缓存（避免重复解码大图）
-  const imageCache = new WeakMap(); // WeakMap<File, HTMLImageElement>
-
-  async function getJobImage(job) {
-    if (imageCache.has(job.file)) return imageCache.get(job.file);
-    const img = await window.ImageDecoder.load(job.file);
-    imageCache.set(job.file, img);
-    return img;
-  }
+  const pendingPhotoImports = new WeakMap();
+  let photoImportQueue = Promise.resolve();
+  let sessionRestore;
 
   // 常见比例格式化
   function formatRatio(r) {
@@ -97,6 +92,12 @@
 
   function activeJob() {
     return state.jobs.find(j => j.id === state.activeJobId) || null;
+  }
+
+  function activePhotoRatio() {
+    const job = activeJob();
+    const ratio = job?.sourceRatio;
+    return ratio && job.orientation?.turns % 2 ? 1 / ratio : ratio;
   }
 
   function activePreset() {
@@ -133,6 +134,8 @@
     state.presets = Storage.allPresets();
     renderPresetGrid();
     setupUpload();
+    setupFilmFrames();
+    setupFilmstrip();
     setupTabs();
     setupStickerLibrary();
     setupInfoForm();
@@ -150,7 +153,7 @@
     setupProductivityControls();
     setupAccessibility();
     updateEmptyState();
-    initSession();         // 恢复上次会话（异步，不阻塞 UI）
+    sessionRestore = initSession();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -182,18 +185,19 @@
     const imageFiles = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif|tiff?)$/i.test(f.name));
     if (!imageFiles.length) { showToast('未检测到图片文件', 'warn'); return; }
 
-    const MAX = 50;
-    if (state.jobs.length + imageFiles.length > MAX) {
-      showToast(`最多支持 ${MAX} 张，已截取前 ${MAX - state.jobs.length} 张`, 'warn');
-      imageFiles.splice(MAX - state.jobs.length);
-    }
+    await sessionRestore;
+    const slots = Math.max(0, MAX_PHOTOS - state.jobs.length);
+    if (!slots) { showToast(`最多支持 ${MAX_PHOTOS} 张照片`, 'warn'); return; }
+    const truncated = imageFiles.length > slots;
+    imageFiles.splice(slots);
 
     for (const file of imageFiles) {
       const job = {
         id: uid(),
         file,
         exif: {},
-        presetId: state.activePresetId,
+        presetId: null,
+        preserveSourceRatio: true,
         overrides: { location: '', camera: '', film: '', date: '' },
         borderOverrides: {},
         infoOverrides: {},
@@ -210,115 +214,150 @@
           .catch(e => showToast(`原图本机保存失败：${e.message}`, 'warn'));
       }
 
-      // 异步读 EXIF，读完后刷新界面并保存元数据
-      ExifReader.read(file).then(exif => {
-        job.exif = exif || {};
-        if (state.activeJobId === job.id) {
-          fillInfoForm(job);
-          schedulePreview();
-        }
-        updateFilmstrip();
-        scheduleSessionSave();
-      });
-
-      // 生成缩略图 URL，完成后保存会话（含 thumbUrl）
-      createThumb(job, () => scheduleSessionSave());
+      queuePhotoImport(job, true);
     }
 
     if (!state.activeJobId) selectJob(state.jobs[0].id);
-    updateFilmstrip();
+    else updateFilmstrip();
     updateEmptyState();
+    if (truncated) showToast(`最多支持 ${MAX_PHOTOS} 张，已添加前 ${imageFiles.length} 张`, 'warn');
+    else showToast(`已添加 ${imageFiles.length} 张照片`);
     if (state.jobs.length > 1) {
-      showToast(`已添加 ${imageFiles.length} 张：调好当前照片后，可用顶部同步按钮应用到后续照片`);
       document.getElementById('btn-sync-edits')?.classList.add('sync-attention');
       setTimeout(() => document.getElementById('btn-sync-edits')?.classList.remove('sync-attention'), 4500);
-    } else showToast(`已添加 ${imageFiles.length} 张照片`);
+    }
   }
 
-  async function createThumb(job, onDone) {
-    try {
-      const img = await getJobImage(job);
-      job.sourceRatio = img.naturalWidth / img.naturalHeight;
-        const size = 120;
-        const canvas = document.createElement('canvas');
-        const scale = size / Math.max(img.width, img.height);
-        canvas.width  = Math.round(img.width  * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        job.thumbUrl = canvas.toDataURL('image/jpeg', 0.8);
-        updateFilmstrip();
-        if (onDone) onDone();
-    } catch (e) {
-      job.status = 'error';
-      showToast(`${job.file.name} 无法解码：${e.message}`, 'error');
+  function closestPreset(ratio) {
+    let best = null;
+    let distance = Infinity;
+    for (const preset of state.presets) {
+      const candidate = preset.thumb?.photoRatio;
+      if (!(candidate > 0) || preset.enforcePhotoRatio === false || preset.border?.film) continue;
+      const error = Math.abs(Math.log(candidate / ratio));
+      if (error < distance) {
+        distance = error;
+        best = preset;
+      }
     }
+    return best || activePreset();
+  }
+
+  function queuePhotoImport(job, readExif = false) {
+    const pending = photoImportQueue.then(async () => {
+      if (!state.jobs.includes(job)) return;
+      try {
+        const image = await ImageDecoder.load(job.file);
+        const thumb = ImageDecoder.downsample(image, 120).toDataURL('image/jpeg', 0.8);
+        const exif = readExif ? await ExifReader.read(job.file) : job.exif;
+        if (!state.jobs.includes(job)) return;
+        job.sourceRatio = image.naturalWidth / image.naturalHeight;
+        job.presetId ??= closestPreset(job.sourceRatio)?.id;
+        job.thumbUrl = thumb;
+        job.exif = exif || {};
+        if (job === activeJob()) selectJob(job.id);
+        else updateFilmstrip();
+        scheduleSessionSave();
+      } catch (e) {
+        if (!state.jobs.includes(job)) return;
+        job.status = 'error';
+        updateFilmstrip();
+        showToast(`${job.file.name} 无法解码：${e.message}`, 'error');
+      }
+    });
+    photoImportQueue = pending;
+    pendingPhotoImports.set(job, pending);
+    pending.then(() => pendingPhotoImports.delete(job));
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // 胶片条
   // ══════════════════════════════════════════════════════════════════════════
+  function setupFilmstrip() {
+    const strip = document.getElementById('filmstrip');
+    strip.addEventListener('contextmenu', e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); });
+    const move = delta => {
+      const index = state.jobs.findIndex(job => job.id === state.activeJobId);
+      const target = state.jobs[index + delta];
+      if (target) selectJob(target.id);
+    };
+    document.getElementById('filmstrip-prev').addEventListener('click', () => move(-1));
+    document.getElementById('filmstrip-next').addEventListener('click', () => move(1));
+    strip.addEventListener('keydown', e => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      move(e.key === 'ArrowLeft' ? -1 : 1);
+      strip.querySelector('.strip-item.active')?.focus({ preventScroll: true });
+    });
+  }
+
+  function createFilmstripItem(job) {
+    const item = document.createElement('div');
+    item.className = 'strip-item';
+    item.dataset.id = job.id;
+    item.tabIndex = 0;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-label', job.file.name);
+
+    const del = document.createElement('button');
+    del.className = 'strip-del';
+    del.textContent = '×';
+    del.title = '移除';
+    del.setAttribute('aria-label', `移除 ${job.file.name}`);
+    del.addEventListener('click', e => { e.stopPropagation(); removeJob(job.id); });
+    item.appendChild(del);
+
+    // Ctrl+点击在 macOS 上可能只派发 pointerdown 和 contextmenu。
+    item.addEventListener('pointerdown', e => {
+      if (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+        e.preventDefault();
+        handleFilmstripSelection(e, job.id);
+      }
+    });
+    item.addEventListener('click', e => {
+      if (e.detail && (e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      handleFilmstripSelection(e, job.id);
+    });
+    item.addEventListener('keydown', e => {
+      if (e.target === item && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        handleFilmstripSelection(e, job.id);
+      }
+    });
+    return item;
+  }
+
   function updateFilmstrip() {
     const strip = document.getElementById('filmstrip');
-    if (!strip) return;
-    strip.oncontextmenu = e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); };
-    strip.innerHTML = '';
-
-    if (state.jobs.length === 0) {
-      strip.hidden = true;
-      return;
-    }
-    strip.hidden = false;
+    const items = new Map([...strip.children].map(item => [item.dataset.id, item]));
+    const activeIndex = state.jobs.findIndex(job => job.id === state.activeJobId);
+    document.getElementById('filmstrip-bar').hidden = !state.jobs.length;
+    document.getElementById('filmstrip-prev').disabled = activeIndex <= 0;
+    document.getElementById('filmstrip-next').disabled = activeIndex >= state.jobs.length - 1;
 
     state.jobs.forEach(job => {
-      const item = document.createElement('div');
+      const existing = items.get(job.id);
+      const item = existing || createFilmstripItem(job);
+      items.delete(job.id);
       const isActive = job.id === state.activeJobId;
-      const isMultiSel = state.selectedJobIds.has(job.id) && state.selectedJobIds.size > 1;
-      item.className = 'strip-item' + (isActive ? ' active' : '') + (isMultiSel ? ' multi-selected' : '');
-      item.dataset.id = job.id;
-      item.tabIndex = 0;
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', String(state.selectedJobIds.has(job.id)));
-      item.title = isActive ? '当前同步样板' : 'Ctrl/⌘ 点击多选；Shift 点击连续选择';
-
-      if (job.thumbUrl) {
+      const isSelected = state.selectedJobIds.has(job.id);
+      item.classList.toggle('active', isActive);
+      item.classList.toggle('multi-selected', isSelected && state.selectedJobIds.size > 1);
+      item.classList.toggle('strip-item-loading', !job.thumbUrl);
+      item.setAttribute('aria-selected', String(isSelected));
+      item.title = job.status === 'error' ? `${job.file.name} · 无法解码`
+        : `${job.file.name} · ${isActive ? '当前同步样板' : 'Ctrl/⌘ 点击多选；Shift 点击连续选择'}`;
+      if (job.thumbUrl && !item.querySelector('img')) {
         const img = document.createElement('img');
         img.src = job.thumbUrl;
-        item.appendChild(img);
-      } else {
-        item.classList.add('strip-item-loading');
+        img.alt = '';
+        item.prepend(img);
       }
-
-      // 删除按钮
-      const del = document.createElement('button');
-      del.className = 'strip-del';
-      del.innerHTML = '×';
-      del.title = '移除';
-      del.addEventListener('click', e => { e.stopPropagation(); removeJob(job.id); });
-      item.appendChild(del);
-
-      let modifiedPointerSelection = false;
-      item.addEventListener('pointerdown', e => {
-        if (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
-          e.preventDefault();
-          modifiedPointerSelection = true;
-          handleFilmstripSelection(e, job.id);
-        }
-      });
-      item.addEventListener('click', e => {
-        if (modifiedPointerSelection) { modifiedPointerSelection = false; return; }
-        handleFilmstripSelection(e, job.id);
-      });
-      item.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleFilmstripSelection(e, job.id); }
-      });
-      // macOS 的 Ctrl+点击会额外触发右键菜单；在胶片条多选场景中阻止它。
-      item.addEventListener('contextmenu', e => {
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modifiedPointerSelection = false; }
-      });
-      strip.appendChild(item);
+      if (!existing) strip.appendChild(item);
     });
+    for (const item of items.values()) item.remove();
 
-    // 更新计数
     const counter = document.getElementById('photo-count');
     if (counter) counter.textContent = state.jobs.length > 1 ? `${state.jobs.length} 张` : '';
   }
@@ -352,18 +391,14 @@
   }
 
   function selectJob(id) {
+    if (state.activeJobId !== id) CanvasRenderer.setLastLayout(null);
     state.activeJobId = id;
     state.selectedStickerId = null;
     state.selectionAnchorId = id;
     const job = activeJob();
 
-    // Sync preset from job's presetId
-    if (job?.presetId && job.presetId !== state.activePresetId) {
-      state.activePresetId = job.presetId;
-      document.querySelectorAll('.preset-card').forEach(card => {
-        card.classList.toggle('active', card.dataset.id === state.activePresetId);
-      });
-    }
+    if (job?.presetId) state.activePresetId = job.presetId;
+    filterAndRenderCards();
 
     // Single selection
     if (!state.selectedJobIds.has(id)) {
@@ -372,6 +407,7 @@
     }
 
     updateFilmstrip();
+    document.querySelector('#filmstrip .active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     if (job) {
       fillInfoForm(job);
       fillBorderForm(activePreset(), job);
@@ -382,23 +418,22 @@
   }
 
   function removeJob(id) {
-    state.jobs = state.jobs.filter(j => j.id !== id);
+    const index = state.jobs.findIndex(job => job.id === id);
+    state.jobs = state.jobs.filter(job => job.id !== id);
     state.selectedJobIds.delete(id);
     SessionStore.deleteJob(id).catch(e => console.warn('删除记录失败', e));
     if (state.activeJobId === id) {
-      state.activeJobId = state.jobs[0]?.id || null;
-      state.selectionAnchorId = state.activeJobId;
       state.selectedJobIds.clear();
-      if (state.activeJobId) state.selectedJobIds.add(state.activeJobId);
+      const next = state.jobs[Math.min(index, state.jobs.length - 1)];
+      if (next) selectJob(next.id);
+      else {
+        state.activeJobId = state.selectionAnchorId = null;
+        clearPreview();
+      }
     }
     updateFilmstrip();
     updateEmptyState();
-    if (state.activeJobId) {
-      fillInfoForm(activeJob());
-      schedulePreview();
-    } else {
-      clearPreview();
-    }
+    scheduleSessionSave();
     updateStorageUsage();
   }
 
@@ -439,6 +474,16 @@
   function filterAndRenderCards() {
     const grid = document.getElementById('preset-grid');
     if (!grid) return;
+    const filmCategory = state.activeCategory === 'film-frame';
+    const query = state.presetQuery.trim().toLowerCase();
+    const filmSearchMatch = state.activeCategory === 'all' && Boolean(query) && FilmStocks.search(query).length > 0;
+    document.getElementById('film-frame-panel').hidden = !(filmCategory || filmSearchMatch);
+    grid.hidden = filmCategory;
+    if (filmCategory || filmSearchMatch) {
+      fillFilmFrameEditor();
+      renderFilmCatalog();
+    }
+    if (filmCategory) return;
     grid.innerHTML = '';
 
     let list;
@@ -454,7 +499,7 @@
           const order = Storage.getRecentIds();
           list = list.filter(p => order.includes(p.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
         } else if (state.activeCategory === 'recommended') {
-          const ratio = activeJob()?.sourceRatio;
+          const ratio = activePhotoRatio();
           list = ratio ? list.filter(p => Math.abs((p.thumb?.photoRatio || 1) - ratio) / ratio < 0.23) : list.slice(0, 8);
         } else if (state.activeCategory === 'custom') {
           list = list.filter(p => p.isCustom);
@@ -464,7 +509,6 @@
       }
     }
 
-    const query = state.presetQuery.trim().toLowerCase();
     if (query) {
       list = list.filter(p => {
         const ratio = formatRatio(p.thumb?.photoRatio || 1);
@@ -477,9 +521,118 @@
       grid.appendChild(card);
     });
 
-    if (list.length === 0) {
+    if (list.length === 0 && !filmSearchMatch) {
       grid.innerHTML = '<p class="preset-empty">此分类暂无预设</p>';
     }
+    grid.hidden = list.length === 0 && filmSearchMatch;
+  }
+
+  function activeFilmFrame() {
+    const job = activeJob();
+    if (!job) return null;
+    return { ...activePreset()?.border, ...job.borderOverrides }.film || null;
+  }
+
+  function fillFilmFrameEditor() {
+    const film = activeFilmFrame();
+    const editor = document.getElementById('film-frame-editor');
+    editor.hidden = !film;
+    if (!film) return;
+    const stock = FilmStocks.get(film.stockId);
+    document.getElementById('film-active-stock').textContent = stock?.name || '自定义胶卷';
+    editor.querySelectorAll('[data-film-field]').forEach(control => {
+      control.value = film[control.dataset.filmField] ?? '';
+    });
+    for (const option of document.getElementById('film-frame-format').options) {
+      option.disabled = Boolean(stock && !stock.formats.includes(option.value));
+    }
+  }
+
+  function renderFilmCatalog() {
+    const format = document.getElementById('film-catalog-format').value;
+    const type = document.getElementById('film-catalog-type').value;
+    const film = activeFilmFrame();
+    const stocks = FilmStocks.search(state.presetQuery, format, type);
+    const fragment = document.createDocumentFragment();
+    for (const stock of stocks) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'film-stock-card';
+      card.dataset.stock = stock.id;
+      card.setAttribute('aria-pressed', String(film?.stockId === stock.id && (!format || film.format === format)));
+      const icon = document.createElement('span');
+      icon.className = 'film-stock-icon';
+      icon.dataset.format = format || stock.formats[0];
+      icon.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      const name = document.createElement('strong');
+      name.textContent = stock.name;
+      const detail = document.createElement('small');
+      detail.textContent = `${stock.formats.join(' / ')} · ${FilmStocks.types[stock.type]}`;
+      label.append(name, detail);
+      card.append(icon, label);
+      fragment.appendChild(card);
+    }
+    document.getElementById('film-catalog').replaceChildren(fragment);
+    document.getElementById('film-catalog-count').textContent = stocks.length
+      ? `${stocks.length} 款胶卷` : '没有匹配的胶卷。试试其他关键词或使用自定义边字。';
+  }
+
+  function setFilmFrame(film) {
+    const job = activeJob();
+    if (!job) return false;
+    job.borderOverrides = { ...job.borderOverrides, film };
+    schedulePreview();
+    return true;
+  }
+
+  function applyFilmStock(stock) {
+    if (!activeJob()) { showToast('请先上传照片', 'warn'); return; }
+    const current = activeFilmFrame();
+    const preferred = document.getElementById('film-catalog-format').value || current?.format;
+    const formats = stock?.formats || ['135', '120'];
+    const format = formats.includes(preferred) ? preferred : formats[0];
+    recordHistory('套用胶片边框');
+    const defaults = FilmFrame.defaults(stock?.id || '', format);
+    setFilmFrame({ ...defaults, ...current, stockId: defaults.stockId, format });
+    fillFilmFrameEditor();
+    renderFilmCatalog();
+    document.getElementById('film-frame-editor').scrollIntoView({ block: 'nearest' });
+  }
+
+  function setupFilmFrames() {
+    const typeSelect = document.getElementById('film-catalog-type');
+    for (const [value, label] of Object.entries(FilmStocks.types)) {
+      typeSelect.add(new Option(label, value));
+    }
+    for (const id of ['film-catalog-type', 'film-catalog-format']) {
+      document.getElementById(id).addEventListener('change', renderFilmCatalog);
+    }
+    document.getElementById('film-catalog').addEventListener('click', event => {
+      const button = event.target.closest('[data-stock]');
+      if (button) applyFilmStock(FilmStocks.get(button.dataset.stock));
+    });
+    document.getElementById('film-frame-custom').addEventListener('click', () => applyFilmStock(null));
+    document.getElementById('film-frame-remove').addEventListener('click', () => {
+      if (!activeFilmFrame()) return;
+      recordHistory('移除胶片边框');
+      setFilmFrame(null);
+      fillFilmFrameEditor();
+      renderFilmCatalog();
+    });
+
+    const editor = document.getElementById('film-frame-editor');
+    let editTarget = null;
+    editor.addEventListener('focusout', () => { editTarget = null; });
+    editor.addEventListener('input', event => {
+      const field = event.target.dataset.filmField;
+      const current = activeFilmFrame();
+      if (!field || !current || current[field] === event.target.value) return;
+      if (event.target !== editTarget || event.target.tagName === 'SELECT') recordHistory('修改胶片边框');
+      editTarget = event.target;
+      setFilmFrame({ ...current, [field]: event.target.value });
+      if (field === 'format') renderFilmCatalog();
+    });
   }
 
   function buildPresetCard(preset) {
@@ -512,7 +665,7 @@
     ratio.className = 'preset-ratio';
     ratio.textContent = isCollage ? `${preset.cells?.length || 0} 格` : formatRatio(preset.thumb?.photoRatio || 1);
     meta.appendChild(ratio);
-    const sourceRatio = activeJob()?.sourceRatio;
+    const sourceRatio = activePhotoRatio();
     if (!isCollage && sourceRatio && Math.abs((preset.thumb?.photoRatio || 1) - sourceRatio) / sourceRatio < 0.12) {
       const recommended = document.createElement('span');
       recommended.className = 'preset-recommended';
@@ -795,7 +948,7 @@
   }
 
   function selectPreset(id) {
-    if (id !== state.activePresetId) recordHistory('选择预设');
+    if (id !== state.activePresetId || activeJob()?.preserveSourceRatio) recordHistory('选择预设');
     Storage.recordRecent(id);
     // 拼图预设 → 进入拼图编辑器
     const collageLayout = window.COLLAGE_LAYOUTS?.find(l => l.id === id);
@@ -827,6 +980,8 @@
     const job = activeJob();
     if (job) {
       job.presetId = id;
+      job.preserveSourceRatio = Boolean(preset.border?.film);
+      if (!job.preserveSourceRatio && job.cropRect) delete job.cropRect.useOwnRatio;
       // 按 presetType 决定覆盖范围
       if (preset.presetType === 'style') {
         // 仅样式预设：只覆盖 border，保留现有 infoOverrides
@@ -847,6 +1002,7 @@
         const j = state.jobs.find(x => x.id === jid);
         if (j) {
           j.presetId = id;
+          j.preserveSourceRatio = Boolean(preset.border?.film);
           if (preset.presetType === 'style') {
             j.borderOverrides = { ...preset.border };
             // 不触碰 infoOverrides
@@ -1519,30 +1675,27 @@
     if (!preset?.output) return;
     const out = preset.output;
     const fmt = document.getElementById('output-format');
-    const res = document.getElementById('output-resolution');
     const qty = document.getElementById('output-quality');
     const ql  = document.getElementById('quality-label');
     if (fmt) fmt.value = out.format  || 'jpeg';
-    if (res) res.value = String(out.longEdge || 3000);
     if (qty) qty.value = out.quality || 95;
     if (ql)  ql.textContent = (out.quality || 95) + '%';
     state.exportFormat    = out.format   || 'jpeg';
     state.exportQuality   = out.quality  || 95;
-    state.exportLongEdge  = out.longEdge || 3000;
   }
 
   async function doExportSingle() {
     const job = activeJob();
     if (!job) { showToast('请先上传照片', 'warn'); return; }
-    const preset = activePreset();
-    if (!preset) return;
-
     const btn = document.getElementById('btn-export-single');
     const panelBtn = document.getElementById('btn-export-single2');
     if (btn) { btn.disabled = true; btn.classList.add('is-busy'); btn.dataset.tooltip = '正在导出…'; btn.setAttribute('aria-label', '正在导出'); }
     if (panelBtn) { panelBtn.disabled = true; panelBtn.textContent = '导出中…'; }
 
     try {
+      await pendingPhotoImports.get(job);
+      const preset = state.presets.find(p => p.id === job.presetId) || activePreset();
+      if (!preset || !state.jobs.includes(job)) return;
       const mergedPreset = buildMergedPreset(preset, job);
       await BatchProcessor.exportSingle(job, mergedPreset);
       showToast('保存成功！');
@@ -1566,8 +1719,10 @@
     if (progress) { progress.hidden = false; }
 
     try {
+      const jobs = [...state.jobs];
+      await Promise.all(jobs.map(job => pendingPhotoImports.get(job)));
       const result = await BatchProcessor.exportZip(
-        state.jobs,
+        jobs.filter(job => state.jobs.includes(job)),
         job => {
           const pid = job?.presetId || state.activePresetId;
           const p = state.presets.find(p => p.id === pid) || activePreset();
@@ -1612,7 +1767,7 @@
       output: {
         format:   state.exportFormat   || preset.output?.format   || 'jpeg',
         quality:  state.exportQuality  || preset.output?.quality  || 95,
-        longEdge: state.exportLongEdge ?? preset.output?.longEdge ?? 3000,
+        longEdge: state.exportLongEdge,
         filenameTemplate: state.exportFilenameTemplate,
       },
     };
@@ -1641,19 +1796,23 @@
   async function renderPreview() {
     const generation = ++_previewGeneration;
     const job = activeJob();
-    const preset = activePreset();
-    if (!job || !preset) return;
+    if (!job) return;
 
     state.isRendering = true;
     const indicator = document.getElementById('render-indicator');
     if (indicator) indicator.hidden = false;
 
     try {
-      const mergedPreset = buildMergedPreset(preset, job);
-      const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1400);
+      await pendingPhotoImports.get(job);
       if (generation !== _previewGeneration || job !== activeJob()) return;
+      if (job.status === 'error') { clearPreview(); return; }
+      const mergedPreset = buildMergedPreset(activePreset(), job);
+      if (!mergedPreset) return;
+      const { canvas, layout, outputLayout } = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1400);
+      if (generation !== _previewGeneration || job !== activeJob()) return;
+      CanvasRenderer.setLastLayout(layout);
       displayPreview(canvas);
-      updateSizeInfo(canvas);
+      updateSizeInfo(canvas, outputLayout);
       updateTextPosHandle();   // 文字位置句柄跟随重渲染更新
       updateStickerTransformHandle();
       // 等浏览器 layout 完成后再定位边框句柄，确保 getBoundingClientRect 是最新值
@@ -1662,8 +1821,10 @@
     } catch (e) {
       console.error('[Preview] 渲染失败:', e);
     } finally {
-      state.isRendering = false;
-      if (indicator) indicator.hidden = true;
+      if (generation === _previewGeneration) {
+        state.isRendering = false;
+        if (indicator) indicator.hidden = true;
+      }
     }
   }
 
@@ -1679,10 +1840,11 @@
         if (!job || !preset || !_borderDragState) break;
         const mergedPreset = buildMergedPreset(preset, job);
         // 拖动中使用较轻的工作预览；松手后 renderPreview 会恢复 1400px 精细预览。
-        const canvas = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1000);
+        const { canvas, layout, outputLayout } = await CanvasRenderer.renderPreview(job.file, mergedPreset, job, 1000);
         if (!_borderDragState || job !== activeJob()) continue;
+        CanvasRenderer.setLastLayout(layout);
         displayPreview(canvas);
-        updateSizeInfo(canvas);
+        updateSizeInfo(canvas, outputLayout);
         updateBorderResizeHandlesDrag();
       } while (_borderRenderQueued);
     } catch (e) {
@@ -1732,18 +1894,13 @@
     preview.height = 1;
   }
 
-  function updateSizeInfo(canvas) {
+  function updateSizeInfo(canvas, outputLayout) {
     const el = document.getElementById('preview-size-info');
     if (el) el.textContent = `预览 ${canvas.width} × ${canvas.height}px`;
     const summary = document.getElementById('output-summary');
-    const layout = CanvasRenderer.getLastLayout();
-    if (summary && layout) {
-      const longEdge = state.exportLongEdge || Math.max(layout.canvasW, layout.canvasH);
-      const scale = longEdge / Math.max(layout.canvasW, layout.canvasH);
-      const width = Math.round(layout.canvasW * scale);
-      const height = Math.round(layout.canvasH * scale);
-      const sizeLabel = state.exportLongEdge === 0 ? '原始尺寸' : `${width} × ${height}px`;
-      summary.innerHTML = `<strong>${sizeLabel}</strong><span>${state.exportFormat.toUpperCase()} · 质量 ${state.exportQuality}% · ${state.jobs.length} 张</span>`;
+    if (summary) {
+      const { canvasW, canvasH } = outputLayout;
+      summary.innerHTML = `<strong>${canvasW} × ${canvasH}px</strong><span>${state.exportFormat.toUpperCase()} · 质量 ${state.exportQuality}% · ${state.jobs.length} 张</span>`;
     }
   }
 
@@ -2122,11 +2279,12 @@
       activePresetId: state.activePresetId,
       activeJobId: state.activeJobId,
       jobs: state.jobs.map(j => ({
-        id: j.id, presetId: j.presetId,
+        id: j.id, presetId: j.presetId, preserveSourceRatio: j.preserveSourceRatio,
         overrides: structuredClone(j.overrides || {}),
         borderOverrides: structuredClone(j.borderOverrides || {}),
         infoOverrides: structuredClone(j.infoOverrides || {}),
         cropRect: structuredClone(j.cropRect || null),
+        orientation: structuredClone(j.orientation || null),
         frameLayout: structuredClone(j.frameLayout || null),
         stickers: structuredClone(j.stickers || []),
       })),
@@ -2147,11 +2305,15 @@
     state.activeJobId = snapshot.activeJobId;
     snapshot.jobs.forEach(saved => {
       const job = state.jobs.find(j => j.id === saved.id);
-      if (job) Object.assign(job, structuredClone(saved));
+      if (job) {
+        Object.assign(job, structuredClone(saved));
+        if (job.sourceRatio) job.presetId ??= closestPreset(job.sourceRatio)?.id;
+      }
     });
+    const job = activeJob();
+    if (job?.presetId) state.activePresetId = job.presetId;
     renderPresetGrid();
     updateFilmstrip();
-    const job = activeJob();
     if (job) { fillInfoForm(job); fillBorderForm(activePreset(), job); }
     state.selectedStickerId = null;
     syncStickerInspector();
@@ -2226,13 +2388,18 @@
 
   async function normalizedCropForTarget(source, target) {
     if (!source.cropRect) return null;
-    const [sourceImage, targetImage] = await Promise.all([getJobImage(source), getJobImage(target)]);
+    const [sourceImage, targetImage] = await Promise.all([
+      CanvasRenderer.loadPreviewSource(source.file), CanvasRenderer.loadPreviewSource(target.file),
+    ]);
+    const from = PhotoOrientation.size(sourceImage.width, sourceImage.height, source.orientation);
+    const to = PhotoOrientation.size(targetImage.width, targetImage.height, source.orientation);
     const crop = source.cropRect;
+    const sx = Math.min(to.width - 1, Math.round(crop.sx / from.width * to.width));
+    const sy = Math.min(to.height - 1, Math.round(crop.sy / from.height * to.height));
     return {
-      sx: Math.round(crop.sx / sourceImage.naturalWidth * targetImage.naturalWidth),
-      sy: Math.round(crop.sy / sourceImage.naturalHeight * targetImage.naturalHeight),
-      sw: Math.round(crop.sw / sourceImage.naturalWidth * targetImage.naturalWidth),
-      sh: Math.round(crop.sh / sourceImage.naturalHeight * targetImage.naturalHeight),
+      ...crop, sx, sy,
+      sw: Math.max(1, Math.min(to.width - sx, Math.round(crop.sw / from.width * to.width))),
+      sh: Math.max(1, Math.min(to.height - sy, Math.round(crop.sh / from.height * to.height))),
     };
   }
 
@@ -2251,6 +2418,7 @@
     const button = document.getElementById('btn-sync-confirm');
     const label = button?.querySelector('span');
     if (button) button.disabled = true;
+    await pendingPhotoImports.get(source);
     recordHistory(`同步到 ${targets.length} 张照片`);
     const contentKeys = ['titleTemplate', 'subtitleTemplate', 'extraLines'];
     const sourcePreset = state.presets.find(p => p.id === source.presetId) || activePreset();
@@ -2263,6 +2431,7 @@
         if (label) label.textContent = `同步中 ${i + 1}/${targets.length}`;
         if (syncFrame) {
           target.presetId = source.presetId;
+          target.preserveSourceRatio = source.preserveSourceRatio;
           target.borderOverrides = structuredClone(source.borderOverrides || {});
           target.frameLayout = structuredClone(source.frameLayout || null);
         }
@@ -2278,7 +2447,17 @@
             target.overrides = structuredClone(source.overrides || {});
           }
         }
-        if (syncCrop) target.cropRect = await normalizedCropForTarget(source, target);
+        if (syncCrop) {
+          const crop = await normalizedCropForTarget(source, target);
+          if (!syncFrame && target.frameLayout && (crop?.useOwnRatio || source.orientation || target.orientation)) {
+            const frameRatio = target.frameLayout.photoW / target.frameLayout.photoH;
+            const turned = ((source.orientation?.turns ?? 0) - (target.orientation?.turns ?? 0)) % 2;
+            resizeCompositionFrame(target, crop ? crop.sw / crop.sh : turned ? 1 / frameRatio : frameRatio);
+          }
+          target.cropRect = crop;
+          target.orientation = source.orientation;
+          if (!crop && source.orientation) target.preserveSourceRatio = source.preserveSourceRatio;
+        }
         if (syncStickers) target.stickers = structuredClone(source.stickers || []);
       }
       updateFilmstrip();
@@ -2407,6 +2586,13 @@
       else exitCropMode(false);
     });
 
+    document.getElementById('crop-transform-tools').addEventListener('click', event => {
+      const action = event.target.closest('[data-photo-transform]')?.dataset.photoTransform;
+      if (!action || !state.cropMode || !cropEditorInstance) return;
+      cropEditorInstance.transform(action);
+      updateCropTitle(activePreset(), cropEditorInstance.targetRatio);
+    });
+
     // 锁定比例开关
     const btnLockRatio = document.getElementById('btn-crop-lock-ratio');
     btnLockRatio?.addEventListener('click', () => {
@@ -2427,7 +2613,7 @@
     btn.hidden = !show;
 
     // 若已有自定义裁切，加 dot 提示
-    btn.classList.toggle('has-crop', !!(job && job.cropRect));
+    btn.classList.toggle('has-crop', !!(job?.cropRect || job?.orientation));
 
     // 文字工具始终随照片显示；即使关闭了信息文字，也能从这里重新启用。
     const btnTP = document.getElementById('btn-text-pos');
@@ -2438,10 +2624,26 @@
     if (btnBR) btnBR.hidden = !show;
   }
 
+  function updateCropTitle(preset, ratio) {
+    document.getElementById('crop-title').textContent = `${preset.name}  ·  ${formatRatio(ratio)}`;
+  }
+
+  function resizeCompositionFrame(job, ratio) {
+    const frame = job.frameLayout;
+    if (!frame?.photoW || !frame.photoH || Math.abs(ratio / (frame.photoW / frame.photoH) - 1) < 0.001) return;
+    const longEdge = Math.max(frame.photoW, frame.photoH);
+    const photoW = longEdge * Math.min(1, ratio);
+    const photoH = longEdge * Math.min(1, 1 / ratio);
+    job.frameLayout = {
+      ...frame, photoW, photoH,
+      canvasW: frame.canvasW - frame.photoW + photoW,
+      canvasH: frame.canvasH - frame.photoH + photoH,
+    };
+  }
+
   async function enterCropMode() {
     const job    = activeJob();
-    const preset = activePreset();
-    if (!job || !preset) { showToast('请先上传照片', 'warn'); return; }
+    if (!job) { showToast('请先上传照片', 'warn'); return; }
 
     const overlay = document.getElementById('crop-overlay');
     if (!overlay) return;
@@ -2450,13 +2652,14 @@
     if (btn) btn.disabled = true;
 
     try {
-      const img         = await getJobImage(job);
-      const targetRatio = preset.thumb?.photoRatio ?? (img.naturalWidth / img.naturalHeight);
-
-      // 展示标题
-      const titleEl = document.getElementById('crop-title');
-      if (titleEl) titleEl.textContent =
-        `${preset.name}  ·  ${formatRatio(targetRatio)}`;
+      await pendingPhotoImports.get(job);
+      const preset = activePreset();
+      if (!preset || job !== activeJob()) return;
+      const source = await CanvasRenderer.loadPreviewSource(job.file);
+      if (job !== activeJob()) return;
+      const { crop } = CanvasRenderer.getComposition(source.width, source.height, preset, job);
+      const targetRatio = crop.sw / crop.sh;
+      updateCropTitle(preset, targetRatio);
 
       closeMobilePanel();
       overlay.hidden = false;
@@ -2476,7 +2679,10 @@
       cropCanvas.style.width  = rect.width  + 'px';
       cropCanvas.style.height = rect.height + 'px';
 
-      cropEditorInstance = new CropEditor(cropCanvas, img, targetRatio, dpr);
+      cropEditorInstance = new CropEditor(cropCanvas, source.image, targetRatio, dpr, {
+        width: source.width, height: source.height, orientation: job.orientation,
+      });
+      cropEditorInstance.setFromCropRect(crop);
       cropHistorySnapshot = historySnapshot();
 
       // 初始化锁定比例按钮状态
@@ -2486,14 +2692,10 @@
         btnLockRatio.textContent = cropEditorInstance.lockRatio ? '🔒 锁定比例' : '🔓 自由比例';
       }
 
-      if (job.cropRect) {
-        cropEditorInstance.setFromCropRect(job.cropRect);
-      }
-
       // Enter 确认 / Esc 取消（仅在裁切模式中生效）
       const cropKeyHandler = e => {
         if (!state.cropMode) return;
-        if (e.key === 'Enter')  { e.preventDefault(); exitCropMode(true);  }
+        if (e.key === 'Enter' && !e.target.closest?.('button')) { e.preventDefault(); exitCropMode(true); }
         if (e.key === 'Escape') { e.preventDefault(); exitCropMode(false); }
       };
       document._cropKeyHandler = cropKeyHandler;
@@ -2516,8 +2718,16 @@
     }
     if (apply && cropEditorInstance) {
       const job = activeJob();
-      if (job) { job.cropRect = cropEditorInstance.getCropData(); }
-      if (cropHistorySnapshot) pushHistorySnapshot(cropHistorySnapshot, '调整构图');
+      if (job && job.id === cropHistorySnapshot?.activeJobId) {
+        const crop = cropEditorInstance.getCropData();
+        const { width, height } = cropEditorInstance.size;
+        const fullPhoto = crop.sx === 0 && crop.sy === 0 && crop.sw === width && crop.sh === height;
+        resizeCompositionFrame(job, crop.sw / crop.sh);
+        job.orientation = cropEditorInstance.orientation;
+        job.cropRect = fullPhoto ? null : { ...crop, useOwnRatio: true };
+        if (fullPhoto) job.preserveSourceRatio = true;
+        pushHistorySnapshot(cropHistorySnapshot, '调整构图');
+      }
     }
     cropHistorySnapshot = null;
     if (cropEditorInstance) { cropEditorInstance.destroy(); cropEditorInstance = null; }
@@ -2526,7 +2736,10 @@
     state.cropMode = false;
     updateStickerTransformHandle();
     updateCropButton();
-    if (apply) schedulePreview();
+    if (apply) {
+      filterAndRenderCards();
+      schedulePreview();
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -2702,17 +2915,6 @@
     if (!state.collageMode || !state.collageLayout) return;
     const layout = state.collageLayout;
 
-    // 为每个 cell 载入 Image 对象
-    const cellsWithImages = await Promise.all(
-      state.collageCells.map(async cell => {
-        if (!cell.file) return { ...cell };
-        const img = imageCache.has(cell.file)
-          ? imageCache.get(cell.file)
-          : await getJobImage({ file: cell.file });
-        return { ...cell, imgCache: img };
-      })
-    );
-
     const titleInput    = document.getElementById('collage-title-input');
     const subtitleInput = document.getElementById('collage-subtitle-input');
     const infoOverride  = {
@@ -2722,7 +2924,7 @@
 
     try {
       const canvas = await CollageRenderer.renderPreview(
-        layout, cellsWithImages, infoOverride, state.collageStyle, 1000
+        layout, state.collageCells, infoOverride, state.collageStyle, 1000
       );
       const preview = document.getElementById('collage-canvas');
       if (!preview) return;
@@ -2866,7 +3068,7 @@
 
     const cellDef    = layout.cells[slotIndex];
     const cellRatio  = cellDef.w / cellDef.h;
-    const img        = await getJobImage({ file: cell.file });
+    const img        = await ImageDecoder.load(cell.file);
 
     // 隐藏拼图 overlay，显示裁切 overlay（复用同一个）
     const collageOverlay = document.getElementById('collage-overlay');
@@ -2947,16 +3149,6 @@
     if (btn) { btn.disabled = true; btn.textContent = '导出中…'; }
 
     try {
-      const cellsWithImages = await Promise.all(
-        state.collageCells.map(async cell => {
-          if (!cell.file) return { ...cell };
-          const img = imageCache.has(cell.file)
-            ? imageCache.get(cell.file)
-            : await getJobImage({ file: cell.file });
-          return { ...cell, imgCache: img };
-        })
-      );
-
       const titleEl    = document.getElementById('collage-title-input');
       const subtitleEl = document.getElementById('collage-subtitle-input');
       const infoOverride = {
@@ -2967,7 +3159,7 @@
 
       const longEdge = state.exportLongEdge || layout.output?.longEdge || 3000;
       const canvas = await CollageRenderer.render(
-        layout, cellsWithImages, infoOverride, longEdge, state.collageStyle
+        layout, state.collageCells, infoOverride, longEdge, state.collageStyle
       );
 
       const fmt     = state.exportFormat || layout.output?.format || 'jpeg';
@@ -4201,6 +4393,7 @@
       await SessionStore.saveSessionState({
         activePresetId: state.activePresetId,
         activeJobId:    state.activeJobId,
+        jobIds: state.jobs.map(job => job.id),
       });
     } catch (e) {
       console.warn('会话保存失败', e);
@@ -4213,6 +4406,10 @@
       const { jobs, sessionState } = await SessionStore.restoreSession();
       if (!jobs.length) return;
 
+      if (sessionState?.jobIds) {
+        const order = new Map(sessionState.jobIds.map((id, index) => [id, index]));
+        jobs.sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
+      }
       state.jobs = jobs;
 
       // 恢复激活状态
@@ -4237,17 +4434,11 @@
           sticker.strokeWidth ??= 0; sticker.strokeColor ||= '#ffffff'; sticker.shadowEnabled ??= true;
           sticker.shadowColor ||= '#000000'; sticker.shadowBlur ??= .035; sticker.shadowDistance ??= .025; sticker.shadowOpacity ??= .28;
         });
-        if (!job.thumbUrl) createThumb(job);
+        if (!job.thumbUrl || !job.presetId) queuePhotoImport(job);
       }
 
-      updateFilmstrip();
+      selectJob(state.activeJobId);
       updateEmptyState();
-      const job = activeJob();
-      if (job) {
-        fillInfoForm(job);
-        fillBorderForm(activePreset(), job);
-        schedulePreview();
-      }
 
       showToast(`已恢复上次编辑（${jobs.length} 张）`, 'info');
     } catch (e) {

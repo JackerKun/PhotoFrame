@@ -237,7 +237,7 @@ test('mobile controls open as a bottom sheet', async ({ page }, testInfo) => {
   await page.locator('.mobile-nav-tab[data-panel="border"]').click();
   await expect(page.locator('#panel-left')).toHaveClass(/mobile-open/);
   await expect(page.locator('#mobile-panel-backdrop')).toBeVisible();
-  await page.locator('#mobile-panel-backdrop').click();
+  await page.locator('#mobile-panel-backdrop').tap({ position: { x: 8, y: 8 } });
   await expect(page.locator('#panel-left')).not.toHaveClass(/mobile-open/);
 });
 

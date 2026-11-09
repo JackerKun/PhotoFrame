@@ -79,13 +79,10 @@
           </svg>
           <div>
             <p>拖拽或点击上传照片</p>
-            <p class="upload-hint">JPEG · PNG · TIFF · HEIC，最多 50 张</p>
+            <p class="upload-hint">JPEG · PNG · TIFF · HEIC，最多 72 张</p>
           </div>
         </div>
       </div>
-
-      <!-- 胶片条 -->
-      <div id="filmstrip" hidden></div>
 
       <!-- Tab 导航 -->
       <div class="panel-tabs" role="tablist" aria-label="编辑工具">
@@ -99,11 +96,67 @@
       <!-- ── Tab: 预设 ────────────────────────────────────────────────── -->
       <div class="tab-content" id="tab-presets">
         <div class="preset-search-wrap">
-          <input id="preset-search" type="search" placeholder="搜索预设、画幅或用途" aria-label="搜索预设">
+          <input id="preset-search" type="search" placeholder="搜索预设、画幅或胶卷" aria-label="搜索预设、画幅或胶卷">
           <kbd>/</kbd>
         </div>
         <div id="category-filter" class="category-filter"></div>
         <div id="preset-grid" class="preset-grid"></div>
+        <section id="film-frame-panel" aria-label="胶片边框" hidden>
+          <fieldset id="film-frame-editor" hidden>
+            <legend>当前照片的胶片边框</legend>
+            <p id="film-active-stock" class="section-title"></p>
+            <small class="field-help">胶片边字显示在照片外侧，套用时使用胶片边框的底色和排版。</small>
+            <div class="film-frame-fields">
+              <div class="form-group">
+                <label for="film-frame-format">边框规格</label>
+                <select id="film-frame-format" data-film-field="format">
+                  <option value="135">135 · 齿孔</option>
+                  <option value="120">120 · 无齿孔</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="film-frame-style">边框样式</label>
+                <select id="film-frame-style" data-film-field="style">
+                  <option value="dark">深色片基</option>
+                  <option value="light">浅色扫描</option>
+                  <option value="cinema">电影扫描</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="film-frame-number">帧号</label>
+              <input id="film-frame-number" type="text" data-film-field="frame" maxlength="20">
+            </div>
+            <div class="form-group">
+              <label for="film-frame-edge-a">边字一（横图上侧 / 竖图右侧）</label>
+              <input id="film-frame-edge-a" type="text" data-film-field="edgeA" maxlength="220">
+            </div>
+            <div class="form-group">
+              <label for="film-frame-edge-b">边字二（横图下侧 / 竖图左侧）</label>
+              <input id="film-frame-edge-b" type="text" data-film-field="edgeB" maxlength="220">
+              <small class="field-help">可混用普通文字与变量。胶卷：{stock} {format} {frame}。拍摄信息：{camera} {lens} {focal} {aperture} {shutter} {iso} {date} {film} {location}。</small>
+            </div>
+            <button id="film-frame-remove" type="button" class="btn btn-outline">移除胶片边框</button>
+          </fieldset>
+          <div class="film-frame-fields">
+            <div class="form-group">
+              <label for="film-catalog-format">胶卷规格</label>
+              <select id="film-catalog-format">
+                <option value="">全部规格</option>
+                <option value="135">135 / 35mm</option>
+                <option value="120">120</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="film-catalog-type">胶卷类别</label>
+              <select id="film-catalog-type"><option value="">全部类别</option></select>
+            </div>
+          </div>
+          <p class="field-help">选胶卷后套用到当前照片。边缘图样为风格模拟，目录包含部分历史规格。</p>
+          <button id="film-frame-custom" type="button" class="btn btn-outline">使用自定义边字</button>
+          <p id="film-catalog-count" class="field-help" aria-live="polite"></p>
+          <div id="film-catalog" aria-label="胶卷目录"></div>
+        </section>
         <button id="btn-save-preset" class="btn btn-outline">将当前参数保存为预设</button>
         <div class="preset-backup-actions" aria-label="预设备份">
           <button id="btn-import-presets" class="btn btn-outline" type="button" title="从 JSON 文件恢复预设">
@@ -522,14 +575,14 @@
           </div>
         </div>
         <div class="form-group">
-          <label>输出长边像素</label>
+          <label for="output-resolution">照片长边像素</label>
           <select id="output-resolution">
+            <option value="0" selected>原始分辨率（默认）</option>
             <option value="1500">1500px（网络分享）</option>
             <option value="2400">2400px（高清分享）</option>
-            <option value="3000" selected>3000px（推荐）</option>
+            <option value="3000">3000px</option>
             <option value="4500">4500px（冲印级）</option>
             <option value="6000">6000px（最高质量）</option>
-            <option value="0">原始尺寸</option>
           </select>
         </div>
         <div class="form-group">
@@ -647,6 +700,12 @@
         <div class="br-line br-inner-line" data-line="right" data-type="inner"></div>
       </div>
 
+      <div class="filmstrip-bar" id="filmstrip-bar" hidden>
+        <button type="button" class="filmstrip-nav" id="filmstrip-prev" aria-label="上一张照片" title="上一张照片（←）">‹</button>
+        <div id="filmstrip" role="listbox" aria-label="照片胶片条" aria-multiselectable="true"></div>
+        <button type="button" class="filmstrip-nav" id="filmstrip-next" aria-label="下一张照片" title="下一张照片（→）">›</button>
+      </div>
+
       <!-- 底部工具栏 -->
       <div class="preview-toolbar">
         <div class="zoom-controls" aria-label="画布缩放">
@@ -720,8 +779,14 @@
           <div class="crop-header-actions">
             <button id="btn-crop-cancel" class="btn btn-secondary btn-sm">取消</button>
             <button id="btn-crop-reset"  class="btn btn-secondary btn-sm">重置居中</button>
-            <button id="btn-crop-done"   class="btn btn-primary   btn-sm">完成裁切</button>
+            <button id="btn-crop-done"   class="btn btn-primary   btn-sm">完成构图</button>
           </div>
+        </div>
+        <div id="crop-transform-tools" class="crop-transform-tools" role="group" aria-label="旋转与翻转">
+          <button type="button" class="btn btn-secondary btn-sm" data-photo-transform="left">左转 90°</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-photo-transform="right">右转 90°</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-photo-transform="horizontal">水平翻转</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-photo-transform="vertical">垂直翻转</button>
         </div>
         <div id="crop-overlay-inner" class="crop-inner">
           <canvas id="crop-canvas"></canvas>
@@ -896,7 +961,7 @@
           <label class="sync-option recommended"><input id="sync-frame-style" type="checkbox" checked><span class="sync-check"></span><span><strong>画幅与边框</strong><small>预设、边距、背景、纹理、描边与投影</small></span><em>推荐</em></label>
           <label class="sync-option"><input id="sync-text-style" type="checkbox" checked><span class="sync-check"></span><span><strong>文字样式与变换</strong><small>字体、大小、颜色、位置、旋转与缩放</small></span></label>
           <label class="sync-option"><input id="sync-text-content" type="checkbox"><span class="sync-check"></span><span><strong>文字内容</strong><small>地点、相机、胶卷、日期与自定义文字</small></span></label>
-          <label class="sync-option"><input id="sync-crop" type="checkbox"><span class="sync-check"></span><span><strong>构图裁切</strong><small>按比例同步裁切位置，不同尺寸照片会自动换算</small></span></label>
+          <label class="sync-option"><input id="sync-crop" type="checkbox"><span class="sync-check"></span><span><strong>构图裁切</strong><small>同步旋转、翻转和裁切位置，不同尺寸照片会按比例换算</small></span></label>
           <label class="sync-option"><input id="sync-stickers" type="checkbox" checked><span class="sync-check"></span><span><strong>贴图与位置</strong><small>同步贴图、层级、大小、旋转、透明度与相对位置</small></span></label>
         </div>
       </div>
@@ -926,8 +991,11 @@
 
 <!-- JS 模块（顺序加载） -->
 <script src="js/presets.js"></script>
+<script src="js/film-stocks.js"></script>
+<script src="js/film-frame.js"></script>
 <script src="js/exif-reader.js"></script>
 <script src="js/image-decoder.js"></script>
+<script src="js/photo-orientation.js"></script>
 <script src="js/canvas-renderer.js"></script>
 <script src="js/crop-editor.js"></script>
 <script src="js/collage-layouts.js"></script>

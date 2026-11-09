@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-04T07:27:04.621Z",
+  "generatedAt": "2026-11-09T02:48:05.843Z",
   "version": "1.0.0",
   "synthetic": true,
   "inventory": {
@@ -13,55 +13,61 @@
       "name": "workspace",
       "width": 1560,
       "height": 1000,
-      "bytes": 52552
+      "bytes": 53128
+    },
+    {
+      "name": "film-frame",
+      "width": 1560,
+      "height": 1000,
+      "bytes": 87920
     },
     {
       "name": "export",
       "width": 1560,
       "height": 1000,
-      "bytes": 56932
+      "bytes": 54740
     },
     {
       "name": "border-editor",
       "width": 1560,
       "height": 1000,
-      "bytes": 71686
+      "bytes": 68242
     },
     {
       "name": "sticker-library",
       "width": 1560,
       "height": 1000,
-      "bytes": 75496
+      "bytes": 73462
     },
     {
       "name": "batch-sync",
       "width": 1560,
       "height": 1000,
-      "bytes": 39012
+      "bytes": 38784
     },
     {
       "name": "crop-editor",
       "width": 1560,
       "height": 1000,
-      "bytes": 49018
+      "bytes": 51556
     },
     {
       "name": "collage",
       "width": 1560,
       "height": 1000,
-      "bytes": 86622
+      "bytes": 85882
     },
     {
       "name": "mobile-editor",
       "width": 390,
       "height": 844,
-      "bytes": 12752
+      "bytes": 14756
     },
     {
       "name": "mobile-tools",
       "width": 390,
       "height": 844,
-      "bytes": 15492
+      "bytes": 14112
     }
   ],
   "export": {
