@@ -1,17 +1,22 @@
 /** Film scan-style borders, drawn at the same scale as the photograph. */
 window.FilmFrame = (() => {
+  const DEFAULT_HOLE_COLOR = '#ffffff';
   const styles = {
-    dark: { base: '#20201f', ink: '#d19a64', marks: '#a47752', holes: '#54504a' },
-    light: { base: '#dedbd4', ink: '#353431', marks: '#848078', holes: '#aaa69d' },
-    cinema: { base: '#171a1e', ink: '#f1eee4', marks: '#e48254', holes: '#474a50' },
+    dark: { base: '#20201f', ink: '#d19a64', marks: '#a47752' },
+    light: { base: '#dedbd4', ink: '#353431', marks: '#848078' },
+    cinema: { base: '#171a1e', ink: '#f1eee4', marks: '#e48254' },
   };
 
   function defaults(stockId, format) {
     return {
-      stockId, format, style: 'dark', frame: '01',
+      stockId, format, style: 'dark', frame: '01', holeColor: DEFAULT_HOLE_COLOR,
       edgeA: '{stock}   ▸   {frame}',
       edgeB: '{format}   {camera}   {lens}   {aperture}   {shutter}   {iso}   {date}',
     };
+  }
+
+  function holeColor(film) {
+    return /^#[0-9a-f]{6}$/i.test(film.holeColor) ? film.holeColor : DEFAULT_HOLE_COLOR;
   }
 
   function padding(film, short, portrait) {
@@ -56,7 +61,7 @@ window.FilmFrame = (() => {
         const pitch = shorter * .10;
         const holeW = shorter * .043;
         const holeH = Math.min(width * .36, shorter * .053);
-        ctx.fillStyle = palette.holes;
+        ctx.fillStyle = holeColor(film);
         ctx.beginPath();
         for (let x = pitch / 2; x < length; x += pitch) {
           ctx.roundRect(x - holeW / 2, marksY - holeH / 2, holeW, holeH, holeW * .23);
@@ -96,5 +101,5 @@ window.FilmFrame = (() => {
     ctx.restore();
   }
 
-  return { defaults, padding, draw };
+  return { defaults, holeColor, padding, draw };
 })();

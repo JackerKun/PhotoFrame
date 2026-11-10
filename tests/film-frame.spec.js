@@ -23,6 +23,8 @@ test('finds film stocks by aliases and format, and restores custom edge text', a
   await expect(page.locator('.film-stock-card')).toHaveCount(1);
   await stock.click();
   await expect(page.locator('#film-frame-format')).toHaveValue('120');
+  await expect(page.getByLabel('齿孔颜色（135）')).toBeHidden();
+  await expect(page.getByRole('button', { name: '使用自定义边字' })).toHaveCount(0);
   await expect(page.locator('#output-summary strong')).toHaveText('708 × 828px');
   await page.locator('#film-frame-style').selectOption('light');
   await page.locator('#film-frame-edge-a').fill('VELVIA TEST ▸ {frame}');
@@ -69,7 +71,7 @@ async function makeExifPhoto(page) {
   return Buffer.concat([Buffer.from(jpeg.slice(0, 2)), app1, Buffer.from('Exif\0\0'), tiff, Buffer.from(jpeg.slice(2))]);
 }
 
-test('prints EXIF in the 135 edge and exports the photograph at native size', async ({ page }, testInfo) => {
+test('prints EXIF and the selected 135 hole color at native size', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.goto('/');
   await page.evaluate(() => {
@@ -89,6 +91,20 @@ test('prints EXIF in the 135 edge and exports the photograph at native size', as
   await page.locator('#film-frame-edge-b').fill('TEST {camera} | {iso} | {stock}');
   const edge = 'TEST Leica M4-2 | ISO 400 | Kodak Portra 400';
   await expect.poll(() => page.evaluate(() => window.drawnFilmEdges.map(entry => entry[1]))).toContain(edge);
+  const color = page.getByLabel('齿孔颜色（135）');
+  await expect(color).toHaveValue('#ffffff');
+  const previewHole = () => page.evaluate(() => {
+    const { shorter, bTop } = CanvasRenderer.getLastLayout();
+    const ctx = document.getElementById('canvas-preview').getContext('2d');
+    return Array.from(ctx.getImageData(Math.round(shorter * .05), Math.round(bTop * .68), 1, 1).data);
+  });
+  await expect.poll(previewHole).toEqual([255, 255, 255, 255]);
+  await color.fill('#62a8de');
+  await expect.poll(previewHole).toEqual([98, 168, 222, 255]);
+  await page.locator('#film-frame-format').selectOption('120');
+  await expect(color).toBeHidden();
+  await page.locator('#film-frame-format').selectOption('135');
+  await expect(color).toHaveValue('#62a8de');
   await page.locator('.panel-tab[data-tab="output"]').click();
   await page.locator('#output-format').selectOption('png');
   await expect(page.locator('#output-summary strong')).toHaveText('929 × 756px');
@@ -109,12 +125,11 @@ test('prints EXIF in the 135 edge and exports the photograph at native size', as
       left: Array.from(ctx.getImageData(14, 78, 1, 1).data),
       right: Array.from(ctx.getImageData(914, 677, 1, 1).data),
       hole: Array.from(ctx.getImageData(30, 53, 1, 1).data),
-      edge: Array.from(ctx.getImageData(1, 53, 1, 1).data),
     };
   }, data);
   expect(actual.size).toEqual([929, 756]);
   expect(actual.left).toEqual(actual.right);
   expect(actual.left[2]).toBeGreaterThan(160);
-  expect(actual.hole[0]).toBeGreaterThan(actual.edge[0] + 35);
+  expect(actual.hole).toEqual([98, 168, 222, 255]);
   expect(await page.evaluate(() => window.drawnFilmEdges)).toContainEqual([929, edge]);
 });

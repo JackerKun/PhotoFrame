@@ -123,6 +123,10 @@
                 </select>
               </div>
             </div>
+            <div class="form-group" id="film-frame-hole-color-row" hidden>
+              <label for="film-frame-hole-color">齿孔颜色（135）</label>
+              <input id="film-frame-hole-color" type="color" data-film-field="holeColor" value="#ffffff">
+            </div>
             <div class="form-group">
               <label for="film-frame-number">帧号</label>
               <input id="film-frame-number" type="text" data-film-field="frame" maxlength="20">
@@ -153,7 +157,6 @@
             </div>
           </div>
           <p class="field-help">选胶卷后套用到当前照片。边缘图样为风格模拟，目录包含部分历史规格。</p>
-          <button id="film-frame-custom" type="button" class="btn btn-outline">使用自定义边字</button>
           <p id="film-catalog-count" class="field-help" aria-live="polite"></p>
           <div id="film-catalog" aria-label="胶卷目录"></div>
         </section>

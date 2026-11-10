@@ -560,8 +560,10 @@
     const stock = FilmStocks.get(film.stockId);
     document.getElementById('film-active-stock').textContent = stock?.name || '自定义胶卷';
     editor.querySelectorAll('[data-film-field]').forEach(control => {
-      control.value = film[control.dataset.filmField] ?? '';
+      const field = control.dataset.filmField;
+      control.value = field === 'holeColor' ? FilmFrame.holeColor(film) : film[field] ?? '';
     });
+    document.getElementById('film-frame-hole-color-row').hidden = film.format !== '135';
     for (const option of document.getElementById('film-frame-format').options) {
       option.disabled = Boolean(stock && !stock.formats.includes(option.value));
     }
@@ -594,7 +596,7 @@
     }
     document.getElementById('film-catalog').replaceChildren(fragment);
     document.getElementById('film-catalog-count').textContent = stocks.length
-      ? `${stocks.length} 款胶卷` : '没有匹配的胶卷。试试其他关键词或使用自定义边字。';
+      ? `${stocks.length} 款胶卷` : '没有匹配的胶卷。试试其他关键词或调整筛选条件。';
   }
 
   function setFilmFrame(film) {
@@ -609,10 +611,9 @@
     if (!activeJob()) { showToast('请先上传照片', 'warn'); return; }
     const current = activeFilmFrame();
     const preferred = document.getElementById('film-catalog-format').value || current?.format;
-    const formats = stock?.formats || ['135', '120'];
-    const format = formats.includes(preferred) ? preferred : formats[0];
+    const format = stock.formats.includes(preferred) ? preferred : stock.formats[0];
     recordHistory('套用胶片边框');
-    const defaults = FilmFrame.defaults(stock?.id || '', format);
+    const defaults = FilmFrame.defaults(stock.id, format);
     setFilmFrame({ ...defaults, ...current, stockId: defaults.stockId, format });
     fillFilmFrameEditor();
     renderFilmCatalog();
@@ -628,10 +629,9 @@
       document.getElementById(id).addEventListener('change', renderFilmCatalog);
     }
     document.getElementById('film-catalog').addEventListener('click', event => {
-      const button = event.target.closest('[data-stock]');
-      if (button) applyFilmStock(FilmStocks.get(button.dataset.stock));
+      const stock = FilmStocks.get(event.target.closest('[data-stock]')?.dataset.stock);
+      if (stock) applyFilmStock(stock);
     });
-    document.getElementById('film-frame-custom').addEventListener('click', () => applyFilmStock(null));
     document.getElementById('film-frame-remove').addEventListener('click', () => {
       if (!activeFilmFrame()) return;
       recordHistory('移除胶片边框');
@@ -650,7 +650,10 @@
       if (event.target !== editTarget || event.target.tagName === 'SELECT') recordHistory('修改胶片边框');
       editTarget = event.target;
       setFilmFrame({ ...current, [field]: event.target.value });
-      if (field === 'format') renderFilmCatalog();
+      if (field === 'format') {
+        fillFilmFrameEditor();
+        renderFilmCatalog();
+      }
     });
   }
 

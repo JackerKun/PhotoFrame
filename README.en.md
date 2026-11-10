@@ -52,9 +52,9 @@ These screenshots use four synthetic demo images on desktop and in a 390-pixel-w
 
 ### Add a film border
 
-Open **预设 → 胶片边框** (Presets → Film borders) and filter by 135 or 120, color or black-and-white negative, reversal, or motion picture negative. The main search under **全部** (All) also finds names and aliases such as `Fuji`, `Fuji Provia`, and `Portra 400`. The simulated 135 border has sprocket holes, while the 120 border has continuous edges. Both formats offer dark film base, light scan, and cinema scan styles.
+Open **预设 → 胶片边框** (Presets → Film borders) and filter by 135 or 120, color or black-and-white negative, reversal, or motion picture negative. The main search under **全部** (All) also finds names and aliases such as `Fuji`, `Fuji Provia`, and `Portra 400`. The simulated 135 border has white sprocket holes by default, with a color picker. The 120 border has continuous edges. Both formats offer dark film base, light scan, and cinema scan styles.
 
-Edit either edge with plain text and variables such as `{stock} · {frame} · {camera} · {shutter} · {iso}`. Available EXIF values are printed on the border. Use **使用自定义边字** (Use custom edge text) for an unlisted stock, then save the style as a custom preset if desired.
+Edit either edge with plain text and variables such as `{stock} · {frame} · {camera} · {shutter} · {iso}`. Available EXIF values are printed on the border. Edit the edge lettering directly after selecting a stock. You can save the result as a custom preset.
 
 ![Dark 135 film border with simulated sprocket holes, Portra 400 and custom edge lettering](docs/screenshots/film-frame.webp)
 
