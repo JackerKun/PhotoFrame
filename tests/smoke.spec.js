@@ -423,6 +423,16 @@ test('keeps the sync source fixed while Ctrl and Shift select targets', async ({
   await expect(page.locator('.strip-item.multi-selected')).toHaveCount(4);
   await page.locator('#btn-sync-edits').click();
   await expect(page.locator('#sync-selected-count')).toHaveText('3');
+  await page.locator('#btn-sync-cancel').click();
+
+  const thumbnails = page.locator('.strip-item');
+  await thumbnails.last().click({ modifiers: ['Shift'] });
+  await expect(page.locator('.strip-item.multi-selected')).toHaveCount(5);
+  await thumbnails.nth(1).click();
+  await expect(page.locator('.strip-item.multi-selected')).toHaveCount(0);
+  await expect(page.locator('.strip-item[aria-selected="true"]')).toHaveCount(1);
+  await expect(thumbnails.nth(1)).toHaveClass(/active/);
+  await expect(thumbnails.nth(1)).toHaveAttribute('aria-selected', 'true');
 });
 
 test('pans a zoomed canvas with the hand tool', async ({ page }, testInfo) => {

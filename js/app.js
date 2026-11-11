@@ -385,6 +385,7 @@
     const additive = event.ctrlKey || event.metaKey;
     const range = event.shiftKey;
     if (!additive && !range) {
+      state.selectedJobIds.clear();
       selectJob(jobId);
       return;
     }
