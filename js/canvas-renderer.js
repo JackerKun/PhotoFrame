@@ -192,7 +192,7 @@ window.CanvasRenderer = (() => {
     const key = `${fontFamily}-${size}`;
     if (fontCache.has(key)) return;
     try {
-      await document.fonts.load(`${size}px "${fontFamily}"`);
+      await document.fonts.load(`${size}px ${FontLibrary.cssFamily(fontFamily)}`);
       fontCache.add(key);
     } catch (_) { /* 降级为系统字体 */ }
   }
@@ -302,7 +302,7 @@ window.CanvasRenderer = (() => {
     let maxLineWidth = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      ctx.font      = `${line.style} ${line.weight} ${line.size}px "${line.font}"`;
+      ctx.font      = `${line.style} ${line.weight} ${line.size}px ${FontLibrary.cssFamily(line.font)}`;
       ctx.fillStyle = line.color;
       maxLineWidth = Math.max(maxLineWidth, measureStyledTextWidth(ctx, line.text, line.tracking, line.size));
       drawStyledText(ctx, line.text, 0, curY - centerY, line.tracking, line.size, strokeWidth > 0);

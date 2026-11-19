@@ -20,6 +20,7 @@
     activeTab: 'presets',
     activeCategory: 'all',
     isRendering: false,
+    isBatchExporting: false,
     exportLongEdge: 0,
     exportFormat: 'jpeg',
     exportQuality: 95,
@@ -158,6 +159,10 @@
       },
     });
     setupInfoForm();
+    FontLibrary.populate(document.getElementById('font-title'), 'Songti SC');
+    FontLibrary.populate(document.getElementById('font-subtitle'), 'system-ui');
+    setupControlGroups();
+    setupHorizontalScrolling();
     setupBorderForm();
     setupExportControls();
     setupZoomControls();
@@ -1148,7 +1153,131 @@
 
   function setVal(id, val) {
     const el = document.getElementById(id);
-    if (el) el.value = val;
+    if (el && (id === 'font-title' || id === 'font-subtitle')) FontLibrary.selectValue(el, val);
+    else if (el) el.value = val;
+  }
+
+  function setupControlGroups() {
+    const groups = [...document.querySelectorAll('#tab-border > .control-group')];
+    const saved = Storage.getSettings().controlGroups || {};
+    groups.forEach(group => {
+      if (typeof saved[group.id] === 'boolean') group.open = saved[group.id];
+      group.addEventListener('toggle', () => {
+        Storage.setSetting('controlGroups', Object.fromEntries(groups.map(item => [item.id, item.open])));
+      });
+    });
+    document.getElementById('btn-expand-groups').addEventListener('click', () => groups.forEach(group => { group.open = true; }));
+    document.getElementById('btn-collapse-groups').addEventListener('click', () => groups.forEach(group => { group.open = false; }));
+    document.getElementById('tab-border').addEventListener('input', () => queueMicrotask(updateControlGroupSummaries));
+    document.getElementById('tab-border').addEventListener('change', () => queueMicrotask(updateControlGroupSummaries));
+    updateControlGroupSummaries();
+  }
+
+  function updateControlGroupSummaries() {
+    const value = id => document.getElementById(id)?.value || '0';
+    const percent = id => `${+(Number(value(id)) * 100).toFixed(1)}%`;
+    const selected = id => document.getElementById(id)?.selectedOptions[0]?.textContent.replace(/（.*?）/g, '') || '';
+    const summaries = {
+      'group-background': `${selected('background-mode')} · ${value('border-color')}`,
+      'group-dimensions': `上 ${percent('border-top')} / 下 ${percent('border-bottom')} / 左 ${percent('border-left')} / 右 ${percent('border-right')}`,
+      'group-edges': `描边 ${percent('photo-stroke-width')} · 投影 ${percent('photo-shadow-opacity')}`,
+      'group-typography': document.getElementById('info-toggle')?.checked ? `${selected('font-title')} / ${selected('font-subtitle')}` : '信息文字已隐藏',
+      'group-text-effects': `字重 ${value('font-title-weight')} / ${value('font-sub-weight')} · 旋转 ${value('font-rotation')}° · 透明度 ${percent('font-opacity')}`,
+      'group-extra': `${document.querySelectorAll('#extra-lines-list .extra-line-item').length} 行额外文字`,
+      'group-position': `水平 ${percent('text-offset-x')} · 垂直 ${percent('text-offset-y')}`,
+    };
+    Object.entries(summaries).forEach(([id, text]) => {
+      const small = document.querySelector(`#${id} > summary small`);
+      if (small) { if (!small.title) small.title = small.textContent; small.textContent = text; }
+    });
+  }
+
+  function setupHorizontalScrolling() {
+    document.querySelectorAll('.sticker-categories, .sticker-tags, #filmstrip, .preview-toolbar, .panel-tabs').forEach(element => {
+      if (element.id !== 'filmstrip') {
+        const shell = document.createElement('div');
+        shell.className = 'horizontal-browser';
+        if (element.classList.contains('preview-toolbar')) shell.classList.add('toolbar-browser');
+        if (element.classList.contains('sticker-categories') || element.classList.contains('sticker-tags')) shell.classList.add('sticker-browser');
+        element.before(shell);
+        shell.appendChild(element);
+        const label = element.id === 'sticker-categories' ? '贴图分类' : element.id === 'sticker-tags' ? '贴图标签' : element.classList.contains('panel-tabs') ? '编辑工具' : '预览工具';
+        const arrows = [-1, 1].map(direction => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `horizontal-arrow ${direction < 0 ? 'previous' : 'next'}`;
+          button.textContent = direction < 0 ? '‹' : '›';
+          button.setAttribute('aria-label', `${label}向${direction < 0 ? '左' : '右'}滚动`);
+          button.addEventListener('click', () => element.scrollBy({ left: direction * Math.max(100, element.clientWidth * .65), behavior: 'smooth' }));
+          shell.appendChild(button);
+          return button;
+        });
+        const update = () => {
+          shell.hidden = element.hidden;
+          const max = element.scrollWidth - element.clientWidth;
+          arrows[0].hidden = arrows[1].hidden = max <= 1;
+          arrows[0].disabled = element.scrollLeft <= 1;
+          arrows[1].disabled = element.scrollLeft >= max - 1;
+          shell.classList.toggle('can-scroll-left', max > 1 && !arrows[0].disabled);
+          shell.classList.toggle('can-scroll-right', max > 1 && !arrows[1].disabled);
+        };
+        let frame;
+        const revealActive = () => {
+          cancelAnimationFrame(frame);
+          frame = requestAnimationFrame(() => {
+            const active = element.querySelector('.active, [aria-selected="true"]');
+            if (active && element.clientWidth) {
+              const box = active.getBoundingClientRect();
+              const viewport = element.getBoundingClientRect();
+              if (box.left < viewport.left + 30 || box.right > viewport.right - 30) {
+                element.scrollLeft += box.left - viewport.left - (element.clientWidth - box.width) / 2;
+              }
+            }
+            update();
+          });
+        };
+        new ResizeObserver(update).observe(element);
+        new MutationObserver(revealActive).observe(element, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden', 'aria-selected'] });
+        element.addEventListener('scroll', update, { passive: true });
+        element.addEventListener('focusin', event => {
+          const target = event.target;
+          if (target !== element && target instanceof HTMLElement && target.matches(':focus-visible')) {
+            const box = target.getBoundingClientRect();
+            const viewport = element.getBoundingClientRect();
+            if (box.left < viewport.left + 30 || box.right > viewport.right - 30) element.scrollLeft += box.left - viewport.left - (element.clientWidth - box.width) / 2;
+          }
+        });
+        update();
+      } else {
+        // The filmstrip already has previous/next-photo buttons and selection scrolling.
+        const bar = element.closest('.filmstrip-bar');
+        const update = () => {
+          bar.classList.toggle('can-scroll-left', element.scrollLeft > 1);
+          bar.classList.toggle('can-scroll-right', element.scrollLeft < element.scrollWidth - element.clientWidth - 1);
+        };
+        new ResizeObserver(update).observe(element);
+        new MutationObserver(update).observe(element, { childList: true });
+        element.addEventListener('scroll', update, { passive: true });
+        update();
+      }
+
+      element.addEventListener('wheel', event => {
+        // Keep native sideways gestures and Ctrl+wheel browser zoom intact.
+        if (event.ctrlKey || event.shiftKey || event.deltaX || !event.deltaY || element.scrollWidth <= element.clientWidth) return;
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1;
+        const next = Math.max(0, Math.min(element.scrollWidth - element.clientWidth, element.scrollLeft + event.deltaY * unit));
+        if (Math.abs(next - element.scrollLeft) < 1) return;
+        event.preventDefault();
+        element.scrollLeft = next;
+      }, { passive: false });
+      if (!element.hasAttribute('tabindex')) element.tabIndex = 0;
+      element.addEventListener('keydown', event => {
+        if (event.target !== element || !['ArrowLeft', 'ArrowRight'].includes(event.key) || element.id === 'filmstrip') return;
+        if (element.scrollWidth <= element.clientWidth) return;
+        event.preventDefault();
+        element.scrollLeft += event.key === 'ArrowRight' ? 100 : -100;
+      });
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1596,6 +1725,7 @@
 
     // 额外文字行
     rebuildExtraLinesList(job);
+    updateControlGroupSummaries();
   }
 
   function applyBorderOverride(key, val) {
@@ -1695,6 +1825,7 @@
   }
 
   function syncExportControlsFromPreset(preset) {
+    updateControlGroupSummaries();
     if (!preset?.output) return;
     const out = preset.output;
     const fmt = document.getElementById('output-format');
@@ -1730,20 +1861,34 @@
     }
   }
 
-  async function doExportBatch() {
+  async function doExportBatch(requestedJobs) {
+    if (state.isBatchExporting) return;
     if (state.jobs.length === 0) { showToast('请先上传照片', 'warn'); return; }
     if (typeof saveAs === 'undefined') { showToast('FileSaver 未加载', 'error'); return; }
 
     const btn = document.getElementById('btn-export-batch');
     const panelBtn = document.getElementById('btn-export-batch2');
     const progress = document.getElementById('batch-progress');
+    const jobs = Array.isArray(requestedJobs) ? requestedJobs.filter(job => state.jobs.includes(job)) : [...state.jobs];
+    if (!jobs.length) { showToast('没有可重试的照片', 'warn'); return; }
+    const controller = new AbortController();
+    const dialog = openBatchExportDialog(jobs, controller);
+    state.isBatchExporting = true;
     if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
     if (panelBtn) panelBtn.disabled = true;
     if (progress) { progress.hidden = false; }
 
     try {
-      const jobs = [...state.jobs];
-      await Promise.all(jobs.map(job => pendingPhotoImports.get(job)));
+      await new Promise((resolve, reject) => {
+        const abort = () => {
+          controller.signal.removeEventListener('abort', abort);
+          reject(new DOMException('已取消批量导出', 'AbortError'));
+        };
+        controller.signal.addEventListener('abort', abort, { once: true });
+        Promise.all(jobs.map(job => pendingPhotoImports.get(job))).then(resolve, reject)
+          .finally(() => controller.signal.removeEventListener('abort', abort));
+        if (controller.signal.aborted) abort();
+      });
       const result = await BatchProcessor.exportZip(
         jobs.filter(job => state.jobs.includes(job)),
         job => {
@@ -1751,23 +1896,142 @@
           const p = state.presets.find(p => p.id === pid) || activePreset();
           return buildMergedPreset(p, job);
         },
-        (done, total) => {
+        (done, total, detail) => {
+          dialog.update(done, total, detail);
           if (progress) progress.value = done / total;
           const badge = document.getElementById('batch-count-badge');
           if (badge) badge.textContent = `${done}/${total}`;
           if (btn) { btn.dataset.tooltip = `处理中 ${done}/${total}`; btn.setAttribute('aria-label', `处理中 ${done}/${total}`); }
           if (panelBtn) panelBtn.textContent = `处理中 ${done}/${total}…`;
-        }
+        },
+        { signal: controller.signal }
       );
+      dialog.finish(result);
       showToast(result.failed.length ? `已导出 ${result.success} 张，${result.failed.length} 张失败` : `${result.success} 张照片已打包下载`, result.failed.length ? 'warn' : 'info');
     } catch (e) {
-      showToast('批量导出失败: ' + e.message, 'error');
+      dialog.finish(null, e);
+      showToast(e.name === 'AbortError' ? '批量导出已取消，未下载 ZIP' : '批量导出失败: ' + e.message, e.name === 'AbortError' ? 'info' : 'error');
     } finally {
+      state.isBatchExporting = false;
       if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); btn.dataset.tooltip = '批量导出 ZIP'; btn.setAttribute('aria-label', '批量导出 ZIP'); }
       const badge = document.getElementById('batch-count-badge'); if (badge) badge.textContent = state.jobs.length;
       if (panelBtn) { panelBtn.disabled = false; panelBtn.textContent = '批量导出 ZIP'; }
       if (progress) { progress.hidden = true; progress.value = 0; }
     }
+  }
+
+  function openBatchExportDialog(jobs, controller) {
+    const modal = document.getElementById('batch-export-dialog');
+    const title = document.getElementById('batch-export-title');
+    const filename = document.getElementById('batch-export-filename');
+    const status = document.getElementById('batch-export-status');
+    const preview = document.getElementById('batch-export-preview');
+    const meter = document.getElementById('batch-export-progress');
+    const count = document.getElementById('batch-export-count');
+    const hint = document.getElementById('batch-export-hint');
+    const close = document.getElementById('btn-batch-export-close');
+    const queue = document.getElementById('batch-export-queue');
+    const cancel = document.getElementById('btn-batch-export-cancel');
+    const retry = document.getElementById('btn-batch-export-retry');
+    let retryJobs = [];
+    retry.hidden = true;
+    retry.onclick = () => { modal.close(); doExportBatch(retryJobs); };
+    cancel.hidden = false;
+    cancel.disabled = false;
+    cancel.textContent = '取消导出';
+    cancel.onclick = () => {
+      controller.abort();
+      cancel.disabled = true;
+      cancel.textContent = '正在取消…';
+      hint.textContent = '正在停止，当前处理结束后退出，不会下载本次 ZIP。';
+    };
+    const previousFocus = modal.contains(document.activeElement) ? document.getElementById('btn-export-batch') : document.activeElement;
+    const rows = new Map();
+    let running = true;
+    queue.replaceChildren();
+    jobs.forEach(job => {
+      const row = document.createElement('li');
+      const name = document.createElement('span');
+      const label = document.createElement('span');
+      name.textContent = job.file.name;
+      name.title = job.file.name;
+      label.textContent = '等待中';
+      row.append(name, label);
+      row.dataset.status = 'waiting';
+      queue.appendChild(row);
+      rows.set(job.id, { row, label });
+    });
+    title.textContent = '正在批量导出';
+    filename.textContent = '正在准备照片…';
+    status.textContent = '请稍候，正在等待照片加载。';
+    hint.textContent = '正在本机处理，请保持页面打开。';
+    preview.hidden = true;
+    preview.removeAttribute('src');
+    meter.value = 0;
+    count.textContent = `0 / ${jobs.length}`;
+    close.disabled = true;
+    close.textContent = '正在处理，请稍候…';
+    close.onclick = () => modal.close();
+    modal.oncancel = event => { if (running) event.preventDefault(); };
+    modal.onclose = () => previousFocus?.focus();
+    modal.onkeydown = event => event.stopPropagation();
+    modal.showModal();
+
+    return {
+      update(done, total, detail = {}) {
+        const { phase, job, failed = [], percent = 0 } = detail;
+        const item = rows.get(job?.id);
+        count.textContent = `${done} / ${total}`;
+        meter.value = total ? 90 * done / total + (phase === 'packing' ? percent * .1 : 0) : 0;
+        if (phase === 'rendering') {
+          filename.textContent = job.file.name;
+          preview.hidden = !job.thumbUrl;
+          if (job.thumbUrl) preview.src = job.thumbUrl;
+          status.textContent = `正在生成第 ${done + 1} / ${total} 张，请稍候…`;
+          if (item) {
+            item.row.dataset.status = 'rendering'; item.label.textContent = '处理中';
+            queue.scrollTop = Math.max(0, item.row.offsetTop - queue.offsetTop - queue.clientHeight / 2);
+          }
+        } else if (phase === 'rendered' && item) {
+          const error = failed.find(entry => entry.job.id === job.id)?.error;
+          item.row.dataset.status = error ? 'failed' : 'done';
+          item.label.textContent = error ? '失败' : '已完成';
+          if (error) {
+            const reason = document.createElement('small');
+            reason.className = 'batch-export-error';
+            reason.textContent = error.message || '处理失败';
+            item.row.firstChild.appendChild(reason);
+          }
+        } else if (phase === 'packing') {
+          status.textContent = `照片已处理，正在打包 ZIP（${Math.round(percent)}%），请稍候…`;
+        }
+      },
+      finish(result, error) {
+        running = false;
+        cancel.hidden = true;
+        retryJobs = (result?.failed || error?.failed || []).map(entry => entry.job);
+        retry.hidden = !retryJobs.length;
+        retry.textContent = `仅重试失败照片（${retryJobs.length}）`;
+        if (error) {
+          title.textContent = error.name === 'AbortError' ? '批量导出已取消' : '批量导出失败';
+          status.textContent = error.message;
+          hint.textContent = error.name === 'AbortError' ? '本次 ZIP 未下载，可关闭后重新导出。' : '可重试失败照片，或关闭后检查设置重新导出。';
+          rows.forEach(({ row, label }) => {
+            if (['waiting', 'rendering'].includes(row.dataset.status)) {
+              row.dataset.status = 'incomplete'; label.textContent = '未导出';
+            }
+          });
+        } else {
+          title.textContent = result.failed.length ? '导出完成，部分照片失败' : '批量导出完成';
+          status.textContent = `已导出 ${result.success} 张${result.failed.length ? `，失败 ${result.failed.length} 张` : ''}，已发起 ZIP 下载。`;
+          hint.textContent = '可在浏览器下载列表中查看 ZIP 文件。';
+          meter.value = 100;
+        }
+        close.disabled = false;
+        close.textContent = '完成';
+        close.focus();
+      },
+    };
   }
 
   function buildMergedPreset(preset, job) {
@@ -1800,6 +2064,7 @@
   // 预览渲染
   // ══════════════════════════════════════════════════════════════════════════
   function schedulePreview() {
+    updateControlGroupSummaries();
     clearTimeout(previewDebounce);
     previewDebounce = setTimeout(renderPreview, 180);
     scheduleSessionSave();
@@ -3266,13 +3531,8 @@
       opts.className = 'extra-line-opts';
 
       const fontSel = document.createElement('select');
-      [['', '继承副标题字体'], ['Songti SC', '宋体'], ['Georgia', 'Georgia'],
-       ['system-ui', '系统无衬线'], ['monospace', '等宽']].forEach(([v, l]) => {
-        const o = document.createElement('option');
-        o.value = v; o.textContent = l;
-        if ((line.font || '') === v) o.selected = true;
-        fontSel.appendChild(o);
-      });
+      fontSel.setAttribute('aria-label', `额外文字行 ${i + 1} 字体`);
+      FontLibrary.populate(fontSel, line.font || '', true);
       fontSel.addEventListener('change', () => {
         ensureExtraLinesOverride(job, baseLines);
         job.infoOverrides.extraLines[i].font = fontSel.value;
@@ -3347,6 +3607,7 @@
       if (slider) slider.value = value;
       if (number) number.value = (value * 100).toFixed(1);
     });
+    updateControlGroupSummaries();
   }
 
   function snapCoordinate(value, targets, threshold) {

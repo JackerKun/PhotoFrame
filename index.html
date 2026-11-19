@@ -231,7 +231,11 @@
           <button id="btn-apply-all" class="icon-action" type="button" title="打开批量同步面板" aria-label="打开批量同步面板"><svg viewBox="0 0 24 24"><path d="M20 7h-8m4-4 4 4-4 4M4 17h8m-4-4-4 4 4 4"/></svg></button>
         </div>
 
-        <div class="section-title">画布背景</div>
+        <div class="control-group-toolbar"><span>按功能调整</span><button id="btn-expand-groups" type="button">全部展开</button><button id="btn-collapse-groups" type="button">全部收起</button></div>
+
+        <details class="control-group" id="group-background" open>
+          <summary><span>画布背景<small>底色、渐变与纹理</small></span></summary>
+          <div class="control-group-body">
         <div class="style-presets" aria-label="背景快捷样式">
           <button type="button" class="style-preset" data-bg-preset="gallery">画廊白</button>
           <button type="button" class="style-preset" data-bg-preset="paper">艺术纸</button>
@@ -267,7 +271,11 @@
           <div class="range-row compact-range"><span>尺度</span><input type="range" id="texture-scale" min="0.4" max="3" step="0.1" value="1"></div>
         </div>
 
-        <div class="section-title">边框宽度（% 短边）</div>
+        </div></details>
+
+        <details class="control-group" id="group-dimensions" open>
+          <summary><span>边框尺寸<small>四边留白与照片圆角 · 按短边百分比</small></span></summary>
+          <div class="control-group-body">
         <div class="form-group">
           <label>上边框</label>
           <div class="range-row">
@@ -310,7 +318,11 @@
           </div>
         </div>
 
-        <div class="section-title">照片边缘与景深</div>
+        </div></details>
+
+        <details class="control-group" id="group-edges">
+          <summary><span>照片边缘与景深<small>描边与投影</small></span></summary>
+          <div class="control-group-body">
         <div class="form-group">
           <label>描边样式</label>
           <div class="form-row">
@@ -326,7 +338,11 @@
           <div class="range-row compact-range"><span>X</span><input type="range" id="photo-shadow-x" min="-0.06" max="0.06" step="0.002" value="0"><span>Y</span><input type="range" id="photo-shadow-y" min="-0.06" max="0.06" step="0.002" value="0.012"></div>
         </div>
 
-        <div class="section-title">信息文字</div>
+        </div></details>
+
+        <details class="control-group" id="group-typography" open>
+          <summary><span>字体与排版<small>主副标题、字号与对齐</small></span></summary>
+          <div class="control-group-body">
         <div class="form-group">
           <div class="toggle-row">
             <label>显示信息文字</label>
@@ -372,13 +388,9 @@
           </div>
         </div>
         <div class="form-group">
+          <span id="system-font-help" class="field-help">优先显示本机可用字体，无需下载。检测受浏览器限制；未检测到的字体仍可用于跨设备预设，缺失字形会自动替代。</span>
           <label>主标题字体</label>
-          <select id="font-title">
-            <option value="Songti SC">宋体（Songti SC）</option>
-            <option value="Georgia">Georgia（西文衬线）</option>
-            <option value="system-ui">系统无衬线</option>
-            <option value="monospace">等宽</option>
-          </select>
+          <select id="font-title" aria-describedby="system-font-help"></select>
         </div>
         <div class="form-group">
           <label>主标题大小（% 短边）</label>
@@ -389,12 +401,7 @@
         </div>
         <div class="form-group">
           <label>副标题字体</label>
-          <select id="font-subtitle">
-            <option value="system-ui">系统无衬线</option>
-            <option value="Songti SC">宋体（Songti SC）</option>
-            <option value="Georgia">Georgia</option>
-            <option value="monospace">等宽</option>
-          </select>
+          <select id="font-subtitle" aria-describedby="system-font-help"></select>
         </div>
         <div class="form-group">
           <label>副标题大小（% 短边）</label>
@@ -404,8 +411,10 @@
           </div>
         </div>
 
-        <details class="text-advanced">
-          <summary>高级文字样式</summary>
+        </div></details>
+
+        <details class="control-group" id="group-text-effects">
+          <summary><span>高级文字样式<small>字重、字距、旋转、描边与阴影</small></span></summary>
           <div class="text-advanced-body">
             <div class="form-group">
               <label>主标题字重</label>
@@ -505,11 +514,17 @@
           </div>
         </details>
 
-        <div class="section-title">额外文字行</div>
+        <details class="control-group" id="group-extra">
+          <summary><span>额外文字行<small>添加文字与独立字体</small></span></summary>
+          <div class="control-group-body">
         <div id="extra-lines-list" class="extra-lines-list"></div>
         <button id="btn-add-extra-line" class="btn btn-outline" style="margin-top:2px">+ 添加文字行</button>
 
-        <div class="section-title">文字位置</div>
+        </div></details>
+
+        <details class="control-group" id="group-position">
+          <summary><span>文字位置<small>水平、垂直偏移</small></span></summary>
+          <div class="control-group-body">
         <div class="form-group">
           <label>水平偏移</label>
           <div class="range-row">
@@ -527,6 +542,8 @@
         <div style="display:flex;justify-content:flex-end">
           <button id="btn-text-pos-reset" class="btn btn-sm" style="font-size:11px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-2)">重置位置</button>
         </div>
+
+        </div></details>
 
       </div>
 
@@ -1069,6 +1086,21 @@
     </div>
   </div>
 
+  <dialog id="batch-export-dialog" class="modal batch-export-modal" aria-labelledby="batch-export-title" aria-describedby="batch-export-status">
+    <h3 id="batch-export-title">正在批量导出</h3>
+    <div class="batch-export-current">
+      <img id="batch-export-preview" alt="当前处理的照片" hidden>
+      <div><strong id="batch-export-filename">正在准备照片…</strong><span id="batch-export-status" role="status" aria-live="polite">请稍候，正在等待照片加载。</span></div>
+    </div>
+    <div class="batch-export-meter">
+      <progress id="batch-export-progress" max="100" value="0" aria-label="批量导出总进度"></progress>
+      <span id="batch-export-count">0 / 0</span>
+    </div>
+    <p id="batch-export-hint" class="field-help">正在本机处理，请保持页面打开。</p>
+    <ol id="batch-export-queue" class="batch-export-queue" aria-label="照片导出队列"></ol>
+    <div class="modal-actions"><button id="btn-batch-export-cancel" class="btn" type="button">取消导出</button><button id="btn-batch-export-retry" class="btn btn-outline" type="button" hidden>仅重试失败照片</button><button id="btn-batch-export-close" class="btn btn-primary" type="button" disabled autofocus>正在处理，请稍候…</button></div>
+  </dialog>
+
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -1084,6 +1116,7 @@
 <script src="js/terrain-map.js"></script>
 <script src="js/city-map.js"></script>
 <script src="js/terrain-map-editor.js"></script>
+<script src="js/font-library.js"></script>
 <script src="js/canvas-renderer.js"></script>
 <script src="js/crop-editor.js"></script>
 <script src="js/collage-layouts.js"></script>

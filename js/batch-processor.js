@@ -6,15 +6,19 @@ window.BatchProcessor = (() => {
   /**
    * 批量渲染并打包 ZIP 下载
    * @param {Array}    jobs     PhotoJob 数组
-   * @param {Function} getPreset   (presetId) => preset
-   * @param {Function} onProgress  (done, total) => void
+   * @param {Function} getPreset   (job) => preset
+   * @param {Function} onProgress  (done, total, { phase, job, failed, percent }) => void
+   * @param {Object} options Optional AbortSignal; cancellation never downloads a partial ZIP.
    */
-  async function exportZip(jobs, getPreset, onProgress) {
+  async function exportZip(jobs, getPreset, onProgress, { signal } = {}) {
     if (typeof JSZip === 'undefined') {
-      alert('JSZip 未加载，请检查网络连接后重试');
-      return;
+      throw new Error('JSZip 未加载，请刷新页面后重试');
     }
 
+    const checkCancelled = () => {
+      if (signal?.aborted) throw new DOMException('已取消批量导出', 'AbortError');
+    };
+    checkCancelled();
     const zip  = new JSZip();
     const folder = zip.folder('PhotoFrame导出');
     const total  = jobs.length;
@@ -23,18 +27,25 @@ window.BatchProcessor = (() => {
     const usedNames = new Set();
 
     for (const [index, job] of jobs.entries()) {
+      checkCancelled();
+      onProgress?.(done, total, { phase: 'rendering', job, failed });
+      // Give the dialog a chance to paint before decoding/rendering a large photo.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      checkCancelled();
       try {
         // getPreset 接收完整 job，返回合并后的 preset
         const preset = getPreset(job);
-        if (!preset) continue;
+        if (!preset) throw new Error('未找到照片对应的预设');
 
         const out = preset.output || {};
         const blob = await renderBlob(job, preset, out);
 
         const ext  = (out.format || 'jpeg') === 'png' ? 'png' : 'jpg';
         let name = resolveFilename(out.filenameTemplate, job, index + 1, ext);
-        if (usedNames.has(name)) name = resolveFilename('{name}_frame_{index}', job, index + 1, ext);
-        usedNames.add(name);
+        const stem = name.slice(0, -(ext.length + 1));
+        let suffix = 2;
+        while (usedNames.has(name.toLowerCase())) name = `${stem}_${suffix++}.${ext}`;
+        usedNames.add(name.toLowerCase());
         folder.file(name, blob);
       } catch (e) {
         console.error('[BatchProcessor] job 失败:', e);
@@ -42,10 +53,21 @@ window.BatchProcessor = (() => {
       }
 
       done++;
-      onProgress && onProgress(done, total);
+      onProgress?.(done, total, { phase: 'rendered', job, failed });
     }
 
-    const content = await zip.generateAsync({ type: 'blob' });
+    checkCancelled();
+    if (!total || failed.length === total) {
+      const error = new Error('没有可导出的照片，请检查照片后重试');
+      error.failed = failed;
+      throw error;
+    }
+    onProgress?.(done, total, { phase: 'packing', failed, percent: 0 });
+    const content = await zip.generateAsync({ type: 'blob' }, metadata => {
+      checkCancelled();
+      onProgress?.(done, total, { phase: 'packing', failed, percent: metadata.percent });
+    });
+    checkCancelled();
     const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     saveAs(content, `PhotoFrame_${ts}.zip`);
     return { success: total - failed.length, failed };

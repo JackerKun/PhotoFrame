@@ -68,6 +68,10 @@ Open **调整构图** (Adjust composition) beneath the canvas. Drag to repositio
 
 **Open:** import → **边框&字体**. Adjust margins and background, then choose **调整边框** (Adjust borders) below the preview. Drag corner / edge handles. **文字工具** (Text tool) lets you reposition caption blocks.
 
+The panel has seven collapsible groups for backgrounds, border dimensions, photo edges, typography, text effects, extra lines and text position. Expand or collapse all groups at once; fold states are remembered, with current settings summarized in each header. Titles, subtitles and extra lines share 49 font choices covering common Windows and macOS fonts. Detected local fonts appear first, with sample previews and recent choices. Other device fonts remain selectable with system substitution when missing; browser privacy settings may limit detection.
+
+Batch ZIP export opens a progress dialog with the current thumbnail, filename, waiting queue, success/failure states and ZIP packing progress. Cancel stops after the current operation without downloading the ZIP. Errors appear directly in the queue, with a retry button for failed photos only. Duplicate filenames receive unique suffixes. Close it with **完成** when processing finishes. Horizontal lists include navigation arrows and edge hints, and keep selected items visible. A regular mouse wheel scrolls sticker categories, tags and the photo filmstrip horizontally when they overflow.
+
 ![Warm-paper theme with background controls, independent margins and inner / outer frame handles](docs/screenshots/border-editor.webp)
 
 ### Add film, camera and personal stickers
