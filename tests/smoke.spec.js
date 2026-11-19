@@ -494,6 +494,7 @@ test('collage professional styling renders', async ({ page }, testInfo) => {
   ]);
   await page.getByRole('button', { name: '拼图', exact: true }).click();
   await page.locator('.preset-card').first().click();
+  await expect(page.locator('.cf-photo')).toHaveCount(2);await page.locator('.cf-photo').nth(0).click();await page.locator('.cf-photo').nth(1).click();await page.locator('#cf-start').click();
   await expect(page.locator('#collage-overlay')).toBeVisible();
   await expect(page.locator('.collage-inspector')).toBeVisible();
   await expect(page.locator('#btn-collage-shuffle')).toBeVisible();
@@ -548,6 +549,7 @@ test('mobile collage workbench uses swipeable full-width panels', async ({ page 
     document.querySelector('#panel-left').classList.remove('mobile-open');
     document.querySelector('#mobile-panel-backdrop').hidden = true;
   });
+  await expect(page.locator('.cf-photo')).toHaveCount(2);await page.locator('.cf-photo').nth(0).click();await page.locator('.cf-photo').nth(1).click();await page.locator('#cf-start').click();
   await expect(page.locator('#collage-overlay')).toBeVisible();
   const panelMetrics = await page.locator('.collage-body').evaluate(body => {
     const preview = body.querySelector('.collage-preview-panel').getBoundingClientRect();

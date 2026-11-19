@@ -334,6 +334,40 @@ window.COLLAGE_LAYOUTS.forEach(l => {
 // CollageRenderer — 拼图渲染引擎
 // ══════════════════════════════════════════════════════════════════════════
 window.CollageRenderer = (() => {
+  // A collage needs all visible sources resident; the single-photo renderer's
+  // three-item cache otherwise thrashes on every frame of a nine-photo layout.
+  const previewSources = new Map(), previewFileIds = new WeakMap();
+  let nextPreviewFileId = 0;
+  const PREVIEW_EDGE = 1024, PREVIEW_PIXELS = 16 * 1024 * 1024;
+  function previewSource(file, frame) {
+    if (!previewFileIds.has(file)) previewFileIds.set(file, ++nextPreviewFileId);
+    // Page snapshots copy frame settings; identify equal frames by value so the
+    // page strip and main canvas share the same prepared image.
+    const key = frame ? `frame:${previewFileIds.get(file)}:${JSON.stringify(frame)}` : file;
+    let entry = previewSources.get(key);
+    if (entry && entry.file === file) {
+      previewSources.delete(key); previewSources.set(key, entry);
+      return entry.promise;
+    }
+    entry = { file, pixels: PREVIEW_EDGE * PREVIEW_EDGE };
+    entry.promise = (async () => {
+      if (frame) {
+        const result = await CanvasRenderer.renderPreview(file, frame.preset, frame.job, PREVIEW_EDGE);
+        return { image:result.canvas, width:result.canvas.width, height:result.canvas.height };
+      }
+      const image = await ImageDecoder.load(file);
+      return { image:ImageDecoder.downsample(image, PREVIEW_EDGE), width:image.naturalWidth, height:image.naturalHeight };
+    })();
+    previewSources.set(key, entry);
+    let pixels = [...previewSources.values()].reduce((sum, item) => sum + item.pixels, 0);
+    while (pixels > PREVIEW_PIXELS) {
+      const oldest = previewSources.keys().next().value;
+      pixels -= previewSources.get(oldest).pixels; previewSources.delete(oldest);
+    }
+    entry.promise.catch(() => { if (previewSources.get(key) === entry) previewSources.delete(key); });
+    return entry.promise;
+  }
+  function clearPreviewCache() { previewSources.clear(); }
 
   function autoCrop(imgW, imgH, targetRatio) {
     const imgR = imgW / imgH;
@@ -357,10 +391,11 @@ window.CollageRenderer = (() => {
     const customRatio = Number(b.canvasRatio);
     const ratio = Number.isFinite(customRatio) && customRatio > 0 ? customRatio : (layout.outputRatio || 1);
     let canvasW, canvasH;
-    if (ratio >= 1) { canvasW = outputLongEdge; canvasH = Math.round(outputLongEdge / ratio); }
-    else            { canvasH = outputLongEdge; canvasW = Math.round(outputLongEdge * ratio); }
+    if (ratio >= 1) { canvasW = outputLongEdge; canvasH = Math.max(1,Math.round(outputLongEdge / ratio)); }
+    else            { canvasH = outputLongEdge; canvasW = Math.max(1,Math.round(outputLongEdge * ratio)); }
 
     const info = Object.assign({}, layout.infoBar, infoOverride);
+    if(b.titleFont)info.titleFont=b.titleFont;if(b.subtitleFont)info.subtitleFont=b.subtitleFont;if(b.titleColor)info.fontColor=b.titleColor;
     const hasInfo = info.enabled !== false && Boolean((info.titleTemplate || '').trim() || (info.subtitleTemplate || '').trim());
     const shorter = Math.min(canvasW, canvasH);
     const topRatio = b.top ?? 0.04;
@@ -392,13 +427,23 @@ window.CollageRenderer = (() => {
 
     CanvasRenderer.paintCanvasBackground(ctx, canvasW, canvasH, b);
 
+    const geometry = { area: { x:paX, y:paY, w:paW, h:paH }, cells: [] };
     // 绘制各单元格
     for (let i = 0; i < layout.cells.length; i++) {
       const cellDef = layout.cells[i];
       const cellData = cells[i];
-      if (!cellData?.file) continue;
+      if (!cellData?.file) {
+        geometry.cells[i] = null;
+        if(preview){const gap=shorter*(b.cellGap||0),x=paX+cellDef.x*paW+gap/2,y=paY+cellDef.y*paH+gap/2,w=Math.max(1,cellDef.w*paW-gap),h=Math.max(1,cellDef.h*paH-gap);
+          ctx.save();ctx.fillStyle='rgba(127,127,127,.10)';ctx.fillRect(x,y,w,h);ctx.strokeStyle='rgba(127,127,127,.55)';ctx.setLineDash([6,5]);ctx.strokeRect(x,y,w,h);ctx.fillStyle='#888';ctx.font=`${Math.max(10,shorter*.03)}px sans-serif`;ctx.textAlign='center';ctx.fillText(`+ ${i+1}`,x+w/2,y+h/2);ctx.restore();
+        }continue;
+      }
 
-      const source = preview ? await CanvasRenderer.loadPreviewSource(cellData.file) : null;
+      const framed = !preview && cellData.frame
+        ? await CanvasRenderer.render(cellData.file, cellData.frame.preset, cellData.frame.job, outputLongEdge) : null;
+      const source = preview ? await previewSource(cellData.file, cellData.frame)
+        : framed ? { image:framed, width:framed.width, height:framed.height } : null;
+      const hasFrame = Boolean(cellData.frame);
       const img = source?.image || await ImageDecoder.load(cellData.file);
       const srcW = source?.width ?? img.naturalWidth;
       const srcH = source?.height ?? img.naturalHeight;
@@ -409,11 +454,14 @@ window.CollageRenderer = (() => {
       const cellX = Math.round(paX + cellDef.x * paW) + gap / 2;
       const cellY = Math.round(paY + cellDef.y * paH) + gap / 2;
       const cellW = Math.max(1, Math.round(cellDef.w * paW) - gap);
-      const cellH = Math.max(1, Math.round(cellDef.h * paH) - gap);
+      const fullH = Math.max(1, Math.round(cellDef.h * paH) - gap);
+      const captionH = cellData.caption ? Math.min(fullH*.2,shorter*.048) : 0;
+      const cellH = Math.max(1, fullH-captionH);
       const cellRadius = Math.max(0, shorter * (b.cellRadius || 0));
 
       const cellRatio = cellW / cellH;
-      const crop = cellData.cropRect || autoCrop(srcW, srcH, cellRatio);
+      const crop = window.CollageEngine ? CollageEngine.crop(srcW, srcH, cellRatio, hasFrame ? null : cellData.cropRect) : cellData.cropRect || autoCrop(srcW, srcH, cellRatio);
+      geometry.cells[i] = { x:cellX,y:cellY,w:cellW,h:cellH,srcW,srcH,crop };
 
       ctx.save();
       if (b.cellShadow) {
@@ -424,8 +472,16 @@ window.CollageRenderer = (() => {
       ctx.beginPath();
       roundCell(ctx, cellX, cellY, cellW, cellH, cellRadius);
       ctx.clip();
-      ctx.drawImage(img, crop.sx * scaleX, crop.sy * scaleY, crop.sw * scaleX, crop.sh * scaleY, cellX, cellY, cellW, cellH);
+      if (cellData.fit === 'contain' || hasFrame) {
+        const scale = Math.min(cellW/srcW,cellH/srcH), w=srcW*scale,h=srcH*scale;
+        ctx.drawImage(img,cellX+(cellW-w)/2,cellY+(cellH-h)/2,w,h);
+      } else ctx.drawImage(img, crop.sx * scaleX, crop.sy * scaleY, crop.sw * scaleX, crop.sh * scaleY, cellX, cellY, cellW, cellH);
       ctx.restore();
+      if (captionH) {
+        ctx.save(); ctx.fillStyle = b.captionColor || '#333333'; ctx.font = `${Math.max(8,shorter*.018)}px ${window.FontLibrary ? FontLibrary.cssFamily(b.captionFont || 'system-ui') : 'sans-serif'}`;
+        ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(cellData.caption,cellX,cellY+cellH+captionH/2,cellW);ctx.restore();
+      }
+      if (framed) framed.width = framed.height = 0;
       const stroke = Math.max(0, shorter * (b.cellStroke || 0));
       if (stroke) { ctx.save(); ctx.strokeStyle = b.cellStrokeColor || '#fff'; ctx.lineWidth = stroke; roundCell(ctx, cellX + stroke / 2, cellY + stroke / 2, cellW - stroke, cellH - stroke, Math.max(0, cellRadius - stroke / 2)); ctx.stroke(); ctx.restore(); }
     }
@@ -435,6 +491,7 @@ window.CollageRenderer = (() => {
       await drawInfo(ctx, canvasW, canvasH, bTop, bBottom, canvasH - bTop - bBottom, shorter, info);
     }
 
+    canvas.collageGeometry = geometry;
     return canvas;
   }
 
@@ -476,5 +533,5 @@ window.CollageRenderer = (() => {
     return render(layout, cells, infoOverride, maxEdge, borderOverride, true);
   }
 
-  return { render, renderPreview };
+  return { render, renderPreview, clearPreviewCache };
 })();

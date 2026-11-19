@@ -284,6 +284,7 @@ async function main() {
     await page.locator('#btn-crop-cancel').click();
     await page.getByRole('button', { name: '拼图', exact: true }).click();
     await page.locator('.preset-card[data-id="cl-4grid"]').click();
+  for(let i=0;i<4;i++)await page.locator('.cf-photo').nth(i).click();await page.locator('#cf-start').click();
     await expect(page.locator('#collage-overlay')).toBeVisible();
     await page.locator('#collage-title-input').fill('秋日光影 / FIELD NOTES');
     await page.locator('#collage-subtitle-input').fill('FOUR FRAMES · A SYNTHETIC PHOTO STUDY');
@@ -341,7 +342,8 @@ async function main() {
     await new Promise((r) => server.close(r));
   }
 }
-main().catch((error) => {
+module.exports = { demoArtwork, rasterize, webp };
+if (require.main === module) main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

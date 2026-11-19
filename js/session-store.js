@@ -10,7 +10,7 @@
  */
 window.SessionStore = (() => {
   const DB_NAME    = 'PhotoFrameDB';
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
   let _db = null;
 
   // ── 打开数据库 ───────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ window.SessionStore = (() => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = e => {
         const db = e.target.result;
+        if (!db.objectStoreNames.contains('fonts')) db.createObjectStore('fonts', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('files'))
           db.createObjectStore('files', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('jobs'))
@@ -191,5 +192,25 @@ window.SessionStore = (() => {
     await idbDelete('stickers', id);
   }
 
-  return { open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll, estimate, saveSticker, listStickers, deleteSticker };
+  async function replaceSession(jobs, sessionState, persistOriginals = true) {
+    await open();
+    return new Promise((resolve, reject) => {
+      const tx = _db.transaction(['files', 'jobs', 'session'], 'readwrite');
+      try {
+      for (const name of ['files', 'jobs', 'session']) tx.objectStore(name).clear();
+      for (const job of jobs) {
+        const { file, ...meta } = job;
+        tx.objectStore('jobs').put(meta);
+        if (persistOriginals) tx.objectStore('files').put({ id: job.id, name: file.name, type: file.type, lastModified: file.lastModified, blob: file });
+      }
+      tx.objectStore('session').put({ key: 'state', ...sessionState });
+      } catch (error) { tx.abort(); reject(error); return; }
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error || new Error('工程保存失败，已保留原会话'));
+      tx.onerror = () => {}; // onabort reports the final transaction result.
+    });
+  }
+  async function saveFont(font) { await open(); await idbPut('fonts', font); }
+  async function listFonts() { await open(); return idbGetAll('fonts'); }
+  return { replaceSession, saveFont, listFonts, open, saveFile, saveJob, deleteJob, saveSessionState, restoreSession, clearAll, estimate, saveSticker, listStickers, deleteSticker };
 })();

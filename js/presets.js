@@ -201,7 +201,7 @@ window.PRESETS = [
     name: '612 超宽幅',
     category: 'wide',
     thumb: { photoRatio: 12/6, orientation: 'landscape' },
-    border: { top: 0.04, bottom: 0.26, left: 0.03, right: 0.03, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.10, bottom: 0.24, left: 0.10, right: 0.10, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -221,7 +221,7 @@ window.PRESETS = [
     name: '617 极宽幅',
     category: 'wide',
     thumb: { photoRatio: 17/6, orientation: 'landscape' },
-    border: { top: 0.04, bottom: 0.28, left: 0.02, right: 0.02, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.12, bottom: 0.26, left: 0.12, right: 0.12, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -241,7 +241,7 @@ window.PRESETS = [
     name: 'XPan 全景',
     category: 'wide',
     thumb: { photoRatio: 65/24, orientation: 'landscape' },
-    border: { top: 0.04, bottom: 0.28, left: 0.03, right: 0.03, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.10, bottom: 0.24, left: 0.10, right: 0.10, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -261,7 +261,7 @@ window.PRESETS = [
     name: '3D XPan',
     category: 'wide',
     thumb: { photoRatio: 65/24, orientation: 'landscape' },
-    border: { top: 0.03, bottom: 0.26, left: 0.03, right: 0.03, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.10, bottom: 0.24, left: 0.10, right: 0.10, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -281,7 +281,7 @@ window.PRESETS = [
     name: 'Lomo Rocket 横',
     category: 'wide',
     thumb: { photoRatio: 3/1, orientation: 'landscape' },
-    border: { top: 0.04, bottom: 0.28, left: 0.03, right: 0.03, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.12, bottom: 0.26, left: 0.12, right: 0.12, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -301,7 +301,7 @@ window.PRESETS = [
     name: 'Lomo Rocket 竖',
     category: 'wide',
     thumb: { photoRatio: 1/3, orientation: 'portrait' },
-    border: { top: 0.03, bottom: 0.14, left: 0.03, right: 0.03, color: '#FFFFFF', radius: 0 },
+    border: { top: 0.10, bottom: 0.18, left: 0.10, right: 0.10, color: '#FFFFFF', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',
@@ -321,7 +321,7 @@ window.PRESETS = [
     name: 'Holga 612',
     category: 'wide',
     thumb: { photoRatio: 2/1, orientation: 'landscape' },
-    border: { top: 0.05, bottom: 0.26, left: 0.04, right: 0.04, color: '#F5F0E8', radius: 0 },
+    border: { top: 0.12, bottom: 0.24, left: 0.12, right: 0.12, color: '#F5F0E8', radius: 0 },
     infoBar: {
       enabled: true,
       titleTemplate: '{location}',

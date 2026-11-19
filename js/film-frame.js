@@ -29,7 +29,8 @@ window.FilmFrame = (() => {
 
   function draw(ctx, layout, film, resolveEdge, paintBackground) {
     const { canvasW, canvasH, bTop, bBottom, bLeft, bRight, shorter, filmPortrait: portrait } = layout;
-    const palette = Object.hasOwn(styles, film.style) ? styles[film.style] : styles.dark;
+    const palette = { ...(Object.hasOwn(styles, film.style) ? styles[film.style] : styles.dark) };
+    for (const key of ['base', 'ink', 'marks']) if (/^#[0-9a-f]{6}$/i.test(film.colorPalette?.[key])) palette[key] = film.colorPalette[key];
     const perforated = film.format === '135';
     const length = portrait ? canvasH : canvasW;
     const cross = portrait ? canvasW : canvasH;

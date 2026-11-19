@@ -1,0 +1,25 @@
+const {test:base,expect}=require('@playwright/test');
+const test=base.extend({page:async({page},use)=>{const errors=[];page.on('pageerror',e=>errors.push(e.message));await use(page);expect(errors).toEqual([]);}});
+const photo=i=>({name:`keys-${i}.svg`,mimeType:'image/svg+xml',buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="tan"/></svg>')});
+async function start(page){await page.goto('/');await page.locator('#file-input').setInputFiles([photo(0),photo(1)]);await expect(page.locator('.strip-item img')).toHaveCount(2);}
+async function collage(page){await page.locator('#btn-collage').click();await page.locator('[data-layout="cl-2h"]').click();for(let i=0;i<2;i++)await page.locator('.cf-photo').nth(i).click();await page.locator('#cf-start').click();await expect.poll(()=>page.locator('#collage-canvas').evaluate(c=>c.width)).toBe(1000);}
+async function reveal(page,id){await page.locator(id).first().evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;el.scrollIntoView({block:'center'});});}
+
+test('Escape closes only the photo picker, then slot crop, then the collage',async({page})=>{
+ await start(page);await collage(page);await reveal(page,'.collage-slot-btn');await page.locator('.collage-slot-card').first().getByRole('button',{name:'换图',exact:true}).click();await expect(page.locator('#photo-picker-overlay')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#photo-picker-overlay')).toBeHidden();await expect(page.locator('#collage-overlay')).toBeVisible();
+ await page.locator('.collage-slot-card').first().getByRole('button',{name:'裁切',exact:true}).click();await expect(page.locator('#crop-overlay')).toBeVisible();await page.locator('#btn-crop-reset').focus();await page.keyboard.press('Escape');await expect(page.locator('#crop-overlay')).toBeHidden();await expect(page.locator('#collage-overlay')).toBeVisible();
+ await page.locator('.collage-slot-card').first().getByRole('button',{name:'裁切',exact:true}).click();await expect(page.locator('#crop-overlay')).toBeVisible();await page.locator('#btn-crop-reset').focus();await page.keyboard.press('Enter');await expect(page.locator('#crop-overlay')).toBeHidden();await expect(page.locator('#collage-overlay')).toBeVisible();expect(await page.evaluate(()=>Boolean(CollageStudio.exportBook().pages[0].cells[0].cropRect))).toBe(true);
+ await page.keyboard.press('Escape');await expect(page.locator('#collage-overlay')).toBeHidden();
+});
+
+test('Enter completes composition from a focused tool and entering composition exits border editing',async({page})=>{
+ await start(page);await page.locator('#btn-border-resize').click();await expect(page.locator('#border-resize-overlay')).toBeVisible();await page.locator('#btn-adjust-crop').click();await expect(page.locator('#crop-overlay')).toBeVisible();await expect(page.locator('#border-resize-overlay')).toBeHidden();await expect(page.locator('#frame-tools')).toBeHidden();await expect(page.locator('#btn-border-resize')).not.toHaveClass(/active/);await expect(page.locator('#frame-grid')).not.toHaveClass(/visible/);
+ await page.locator('#btn-crop-reset').click();await page.keyboard.press('ArrowRight');await page.keyboard.press('Enter');await expect(page.locator('#crop-overlay')).toBeHidden();await expect(page.locator('#border-resize-overlay')).toBeHidden();await page.locator('#btn-adjust-crop').click();await expect(page.locator('#crop-overlay')).toBeVisible();await page.locator('#btn-crop-done').focus();await page.keyboard.press('Enter');await expect(page.locator('#crop-overlay')).toBeHidden();
+});
+
+test('restored old panorama defaults update but custom border edits are retained',async({page})=>{
+ await start(page);await expect.poll(()=>page.evaluate(async()=>(await SessionStore.restoreSession()).sessionState?.projectPresets?.length||0)).toBeGreaterThan(0);
+ await page.evaluate(async()=>{const {sessionState}=await SessionStore.restoreSession();sessionState.activePresetId='612-h';const p=sessionState.projectPresets.find(p=>p.id==='612-h');Object.assign(p.border,{top:.04,bottom:.26,left:.03,right:.03});const custom=sessionState.projectPresets.find(p=>p.id==='617');custom.border.top=.17;await SessionStore.saveSessionState(sessionState);});await page.reload();await expect(page.locator('.strip-item img')).toHaveCount(2);
+ // The persisted catalog after restoration should contain the upgraded default and retain edits.
+ await page.locator('#btn-adjust-crop').click();await expect(page.locator('#crop-overlay')).toBeVisible();await page.keyboard.press('Escape');await expect.poll(()=>page.evaluate(async()=>{const {sessionState}=await SessionStore.restoreSession();return sessionState.projectPresets.find(p=>p.id==='612-h').border.top;})).toBe(.10);expect(await page.evaluate(async()=>{const {sessionState}=await SessionStore.restoreSession();return sessionState.projectPresets.find(p=>p.id==='617').border.top;})).toBe(.17);
+});

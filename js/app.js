@@ -62,6 +62,7 @@
   let _previewGeneration = 0;
   let _borderOverlaySyncRaf = null;
   let sessionSaveDebounce = null;
+  let sessionSaveInFlight = Promise.resolve();
   let cropEditorInstance = null;
   let _panDragState = null;
   let cropHistorySnapshot = null;
@@ -171,11 +172,63 @@
     setupMobileNav();
     setupCropMode();       // 裁切模式
     setupCollageMode();    // 拼图模式
+    CollageStudio.setup({ state, sync:syncCollageStyleControls, slots:updateSlotList, preview:scheduleCollagePreview,
+      save:scheduleSessionSave, pick:openPhotoPicker, close:exitCollageMode,
+      importFiles:handleFiles, ready:()=>Promise.all([sessionRestore, photoImportQueue]),
+      flush() { clearTimeout(sessionSaveDebounce); return doSaveSession(); },
+      merged(job) { return buildMergedPreset(state.presets.find(p => p.id === job.presetId) || activePreset(), job); },
+    });
+    CollageFlow.setup({state, start:enterCollageMode, importFiles:handleFiles,
+      ready:()=>Promise.all([sessionRestore, photoImportQueue])});
     setupTextPosMode();    // 文字位置拖拽
     setupBorderResizeMode(); // 边框拖拽调整
     setupClearSession();   // 清空会话按钮
     setupProductivityControls();
     setupAccessibility();
+    CreativeTools.setup({ state, activeJob, activePreset, showToast, recordHistory,
+      merged(job) { return buildMergedPreset(state.presets.find(p => p.id === job.presetId) || activePreset(), job); },
+      ready: () => Promise.all([sessionRestore, photoImportQueue]),
+      refresh() { updateFilmstrip(); updateEmptyState(); if (activeJob()) { fillInfoForm(activeJob()); fillBorderForm(activePreset(), activeJob()); } schedulePreview(); },
+      selectJob, queuePhotoImport, save: scheduleSessionSave,
+      async replaceProject(data) {
+        clearTimeout(sessionSaveDebounce);
+        await sessionSaveInFlight;
+        await SessionStore.replaceSession(data.jobs, {
+          activePresetId: data.activePresetId, activeJobId: data.activeJobId || data.jobs[0]?.id,
+          jobIds: data.jobs.map(job => job.id), projectPresets: data.presets, output: data.output,
+        }, state.persistOriginals);
+        exitCollageMode();
+        CollageStudio.restore(null);
+        CollageStudio.restoreTemplates(data.collageTemplates || []);
+        state.jobs = data.jobs; state.presets = data.presets;
+        if (data.presetBundle) Storage.importPresetBundle(data.presetBundle);
+        for (const preset of data.presets.filter(p => p.isCustom)) Storage.saveCustomPreset(preset);
+        if (data.output) Object.assign(state, { exportFormat: data.output.format, exportQuality: data.output.quality, exportLongEdge: data.output.longEdge, exportFilenameTemplate: data.output.filenameTemplate });
+        state.pickFilter = 'all';
+        state.activePresetId = data.activePresetId;
+        state.activeJobId = data.activeJobId || data.jobs[0]?.id;
+        state.selectedJobIds = new Set(state.activeJobId ? [state.activeJobId] : []);
+        state.undoStack = []; state.redoStack = []; updateHistoryButtons();
+        state.customStickers = data.customStickers || [];
+        for (const job of state.jobs) queuePhotoImport(job);
+        for (const asset of state.customStickers) await SessionStore.saveSticker(asset);
+        renderPresetGrid(); renderStickerGrid();
+        if (state.activeJobId) selectJob(state.activeJobId);
+        updateEmptyState(); await doSaveSession();
+        if (data.collageBook) {
+          CollageStudio.restore(data.collageBook, true);
+        } else if (data.collage?.layout) {
+          enterCollageMode(data.collage.layout);
+          state.collageCells = data.collage.cells; state.collageStyle = data.collage.style;
+          setVal('collage-title-input', data.collage.title || '');
+          setVal('collage-subtitle-input', data.collage.subtitle || '');
+          syncCollageStyleControls(); updateSlotList(); scheduleCollagePreview();
+          CollageStudio.restore({pages:[{layout:state.collageLayout,cells:state.collageCells,style:state.collageStyle,title:data.collage.title,subtitle:data.collage.subtitle}],index:0},true);
+        }
+        clearTimeout(sessionSaveDebounce);
+        await doSaveSession();
+      },
+    });
     updateEmptyState();
     sessionRestore = initSession();
   }
@@ -301,8 +354,9 @@
     const strip = document.getElementById('filmstrip');
     strip.addEventListener('contextmenu', e => { if (e.ctrlKey || e.metaKey) e.preventDefault(); });
     const move = delta => {
-      const index = state.jobs.findIndex(job => job.id === state.activeJobId);
-      const target = state.jobs[index + delta];
+      const visible = state.jobs.filter(job => !state.pickFilter || state.pickFilter === 'all' || (job.pick || 'pending') === state.pickFilter);
+      const index = visible.findIndex(job => job.id === state.activeJobId);
+      const target = visible[index + delta];
       if (target) selectJob(target.id);
     };
     document.getElementById('filmstrip-prev').addEventListener('click', () => move(-1));
@@ -355,10 +409,11 @@
   function updateFilmstrip() {
     const strip = document.getElementById('filmstrip');
     const items = new Map([...strip.children].map(item => [item.dataset.id, item]));
-    const activeIndex = state.jobs.findIndex(job => job.id === state.activeJobId);
+    const visible = state.jobs.filter(job => !state.pickFilter || state.pickFilter === 'all' || (job.pick || 'pending') === state.pickFilter);
+    const activeIndex = visible.findIndex(job => job.id === state.activeJobId);
     document.getElementById('filmstrip-bar').hidden = !state.jobs.length;
     document.getElementById('filmstrip-prev').disabled = activeIndex <= 0;
-    document.getElementById('filmstrip-next').disabled = activeIndex >= state.jobs.length - 1;
+    document.getElementById('filmstrip-next').disabled = activeIndex >= visible.length - 1;
 
     state.jobs.forEach(job => {
       const existing = items.get(job.id);
@@ -367,6 +422,8 @@
       const isActive = job.id === state.activeJobId;
       const isSelected = state.selectedJobIds.has(job.id);
       item.classList.toggle('active', isActive);
+      item.dataset.pick = job.pick || 'pending';
+      item.hidden = state.pickFilter && state.pickFilter !== 'all' && (job.pick || 'pending') !== state.pickFilter;
       item.classList.toggle('multi-selected', isSelected && state.selectedJobIds.size > 1);
       item.classList.toggle('strip-item-loading', !job.thumbUrl);
       item.setAttribute('aria-selected', String(isSelected));
@@ -445,6 +502,7 @@
   function removeJob(id) {
     const index = state.jobs.findIndex(job => job.id === id);
     state.jobs = state.jobs.filter(job => job.id !== id);
+    CreativeTools.photosChanged();
     state.selectedJobIds.delete(id);
     SessionStore.deleteJob(id).catch(e => console.warn('删除记录失败', e));
     if (state.activeJobId === id) {
@@ -655,7 +713,7 @@
       if (!field || !current || current[field] === event.target.value) return;
       if (event.target !== editTarget || event.target.tagName === 'SELECT') recordHistory('修改胶片边框');
       editTarget = event.target;
-      setFilmFrame({ ...current, [field]: event.target.value });
+      setFilmFrame({ ...current, [field]: event.target.value, ...(field === 'style' ? { colorPalette: null } : {}) });
       if (field === 'format') {
         fillFilmFrameEditor();
         renderFilmCatalog();
@@ -981,7 +1039,7 @@
     // 拼图预设 → 进入拼图编辑器
     const collageLayout = window.COLLAGE_LAYOUTS?.find(l => l.id === id);
     if (collageLayout) {
-      enterCollageMode(collageLayout);
+      CollageFlow.open(collageLayout);
       return;
     }
 
@@ -2575,6 +2633,7 @@
         orientation: structuredClone(j.orientation || null),
         frameLayout: structuredClone(j.frameLayout || null),
         stickers: structuredClone(j.stickers || []),
+        pick: j.pick || 'pending',
       })),
     };
   }
@@ -2858,6 +2917,33 @@
   // 裁切模式
   // ══════════════════════════════════════════════════════════════════════════
   function setupCropMode() {
+    // Handle the topmost editor surface before document-level shortcuts.
+    document.addEventListener('keydown', event => {
+      if (event.isComposing || !['Escape', 'Enter'].includes(event.key)) return;
+      if (document.querySelector('dialog[open]')) return;
+      const picker = document.getElementById('photo-picker-overlay');
+      if (picker && !picker.hidden) {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closePhotoPicker(); }
+        return;
+      }
+      const modal = document.querySelector('.modal-overlay:not([hidden])');
+      if (modal) {
+        if (event.key === 'Escape') {
+          event.preventDefault(); event.stopImmediatePropagation();
+          if (modal.id === 'sync-edits-overlay') closeSyncModal();
+          else modal.querySelector('#btn-modal-cancel')?.click();
+        }
+        return;
+      }
+      if (state.cropMode || state.slotCropMode) {
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (!cropEditorInstance) return;
+        if (state.slotCropMode) exitSlotCropMode(event.key === 'Enter');
+        else exitCropMode(event.key === 'Enter');
+      } else if (state.collageMode && event.key === 'Escape') {
+        event.preventDefault(); event.stopImmediatePropagation(); exitCollageMode();
+      }
+    }, { capture:true });
     const btnEnter  = document.getElementById('btn-adjust-crop');
     const btnDone   = document.getElementById('btn-crop-done');
     const btnReset  = document.getElementById('btn-crop-reset');
@@ -2936,6 +3022,8 @@
     const overlay = document.getElementById('crop-overlay');
     if (!overlay) return;
 
+    if (state.borderResizeMode) exitBorderResizeMode();
+    if (state.textPosMode) exitTextPosMode();
     const btn = document.getElementById('btn-adjust-crop');
     if (btn) btn.disabled = true;
 
@@ -2980,14 +3068,6 @@
         btnLockRatio.textContent = cropEditorInstance.lockRatio ? '🔒 锁定比例' : '🔓 自由比例';
       }
 
-      // Enter 确认 / Esc 取消（仅在裁切模式中生效）
-      const cropKeyHandler = e => {
-        if (!state.cropMode) return;
-        if (e.key === 'Enter' && !e.target.closest?.('button')) { e.preventDefault(); exitCropMode(true); }
-        if (e.key === 'Escape') { e.preventDefault(); exitCropMode(false); }
-      };
-      document._cropKeyHandler = cropKeyHandler;
-      document.addEventListener('keydown', cropKeyHandler);
     } catch (e) {
       showToast('进入裁切模式失败: ' + e.message, 'error');
       overlay.hidden = true;
@@ -2999,11 +3079,6 @@
   }
 
   function exitCropMode(apply = true) {
-    // 移除 Enter/Esc 监听
-    if (document._cropKeyHandler) {
-      document.removeEventListener('keydown', document._cropKeyHandler);
-      document._cropKeyHandler = null;
-    }
     if (apply && cropEditorInstance) {
       const job = activeJob();
       if (job && job.id === cropHistorySnapshot?.activeJobId) {
@@ -3123,8 +3198,9 @@
       scheduleCollagePreview();
     });
     document.getElementById('btn-collage-shuffle')?.addEventListener('click', () => {
-      for (let i = state.collageCells.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+      const movable = state.collageCells.map((c,i) => c.locked ? -1 : i).filter(i => i >= 0);
+      for (let k = movable.length - 1; k > 0; k--) {
+        const i = movable[k], j = movable[Math.floor(Math.random() * (k + 1))];
         [state.collageCells[i], state.collageCells[j]] = [state.collageCells[j], state.collageCells[i]];
       }
       updateSlotList();
@@ -3140,7 +3216,8 @@
       });
   }
 
-  function enterCollageMode(layout) {
+  function enterCollageMode(layout, photos = state.jobs, resume = false) {
+    if (state.collageMode) exitCollageMode();
     // 退出普通裁切模式（若有）
     if (state.cropMode) exitCropMode(false);
 
@@ -3154,7 +3231,7 @@
 
     // 自动预填已上传的照片
     if (state.jobs.length > 0) {
-      state.jobs.slice(0, layout.cellCount).forEach((job, i) => {
+      photos.slice(0, layout.cellCount).forEach((job, i) => {
         state.collageCells[i].file = job.file;
       });
     }
@@ -3169,23 +3246,20 @@
     setVal('collage-subtitle-input', '');
     syncCollageStyleControls();
 
+    CollageStudio.opened(resume);
     updateSlotList();
     scheduleCollagePreview();
 
-    // Esc 退出拼图编辑
-    const keyHandler = e => {
-      if (!state.collageMode) return;
-      if (e.key === 'Escape') { e.preventDefault(); exitCollageMode(); }
-    };
-    document._collageKeyHandler = keyHandler;
-    document.addEventListener('keydown', keyHandler);
+
   }
 
   function exitCollageMode() {
-    if (document._collageKeyHandler) {
-      document.removeEventListener('keydown', document._collageKeyHandler);
-      document._collageKeyHandler = null;
-    }
+    if (state.collageMode) CollageStudio.closed();
+    CollageRenderer.clearPreviewCache();
+    clearTimeout(collagePreviewDebounce);
+    if (collagePreviewFrame !== null) cancelAnimationFrame(collagePreviewFrame);
+    collagePreviewFrame = null;
+    ++collageRenderVersion;
     const overlay = document.getElementById('collage-overlay');
     if (overlay) overlay.hidden = true;
     state.collageMode   = false;
@@ -3194,14 +3268,27 @@
     state.collageActiveSlot = -1;
   }
 
-  function scheduleCollagePreview() {
+  let collageRenderVersion = 0, collageRenderBusy = false, collageRenderQueued = false, collagePreviewFrame = null;
+  function scheduleCollagePreview(immediate = false) {
+    ++collageRenderVersion;
     clearTimeout(collagePreviewDebounce);
-    collagePreviewDebounce = setTimeout(renderCollagePreview, 250);
+    if (immediate) {
+      if (collagePreviewFrame === null) collagePreviewFrame = requestAnimationFrame(() => {
+        collagePreviewFrame = null; renderCollagePreview();
+      });
+    } else {
+      if (collagePreviewFrame !== null) cancelAnimationFrame(collagePreviewFrame);
+      collagePreviewFrame = null;
+      collagePreviewDebounce = setTimeout(renderCollagePreview, 150);
+    }
   }
 
   async function renderCollagePreview() {
     if (!state.collageMode || !state.collageLayout) return;
+    if (collageRenderBusy) { collageRenderQueued = true; return; }
+    collageRenderBusy = true;
     const layout = state.collageLayout;
+    const version = collageRenderVersion;
 
     const titleInput    = document.getElementById('collage-title-input');
     const subtitleInput = document.getElementById('collage-subtitle-input');
@@ -3215,12 +3302,18 @@
         layout, state.collageCells, infoOverride, state.collageStyle, 1000
       );
       const preview = document.getElementById('collage-canvas');
-      if (!preview) return;
-      preview.width  = canvas.width;
-      preview.height = canvas.height;
+      if (!preview || version !== collageRenderVersion || !state.collageMode) { canvas.width = canvas.height = 0; return; }
+      if (preview.width !== canvas.width) preview.width = canvas.width;
+      if (preview.height !== canvas.height) preview.height = canvas.height;
+      preview.getContext('2d').clearRect(0, 0, preview.width, preview.height);
       preview.getContext('2d').drawImage(canvas, 0, 0);
+      CollageStudio.rendered(canvas);
+      canvas.width = canvas.height = 0;
     } catch (e) {
       console.error('[CollagePreview]', e);
+    } finally {
+      collageRenderBusy = false;
+      if (collageRenderQueued) { collageRenderQueued = false; scheduleCollagePreview(true); }
     }
   }
 
@@ -3280,6 +3373,8 @@
       assignBtn.textContent = cell.file ? '换图' : '选图';
       assignBtn.addEventListener('click', e => { e.stopPropagation(); openPhotoPicker(i); });
       actions.appendChild(assignBtn);
+      const focusBtn = document.createElement('button'); focusBtn.className='collage-slot-btn'; focusBtn.textContent='编辑';
+      focusBtn.addEventListener('click',e=>{e.stopPropagation();CollageStudio.select(i);}); actions.appendChild(focusBtn);
 
       if (cell.file) {
         const cropBtn = document.createElement('button');
@@ -3343,7 +3438,8 @@
 
   function assignSlotPhoto(slotIndex, file) {
     if (slotIndex < 0 || slotIndex >= state.collageCells.length) return;
-    state.collageCells[slotIndex] = { file, cropRect: null };
+    state.collageCells[slotIndex] = { ...state.collageCells[slotIndex], file, cropRect: null, frame:undefined };
+    CollageStudio.changed();
     updateSlotList();
     scheduleCollagePreview();
   }
@@ -3352,10 +3448,12 @@
     const cell   = state.collageCells[slotIndex];
     const layout = state.collageLayout;
     if (!cell?.file || !layout) return;
+    if (state.borderResizeMode) exitBorderResizeMode();
+    if (state.textPosMode) exitTextPosMode();
     closeMobilePanel();
 
     const cellDef    = layout.cells[slotIndex];
-    const cellRatio  = cellDef.w / cellDef.h;
+    const cellRatio  = CollageStudio.cellRatio(slotIndex) || cellDef.w / cellDef.h;
     const img        = await ImageDecoder.load(cell.file);
 
     // 隐藏拼图 overlay，显示裁切 overlay（复用同一个）
@@ -3387,21 +3485,10 @@
     cropEditorInstance = new CropEditor(cropCanvas, img, cellRatio, dpr);
     if (cell.cropRect) cropEditorInstance.setFromCropRect(cell.cropRect);
 
-    // Enter / Esc 快捷键
-    const keyHandler = e => {
-      if (!state.slotCropMode) return;
-      if (e.key === 'Enter')  { e.preventDefault(); exitSlotCropMode(true);  }
-      if (e.key === 'Escape') { e.preventDefault(); exitSlotCropMode(false); }
-    };
-    document._cropKeyHandler = keyHandler;
-    document.addEventListener('keydown', keyHandler);
+
   }
 
   function exitSlotCropMode(apply) {
-    if (document._cropKeyHandler) {
-      document.removeEventListener('keydown', document._cropKeyHandler);
-      document._cropKeyHandler = null;
-    }
 
     if (apply && cropEditorInstance) {
       const idx = state.slotCropIndex;
@@ -3421,7 +3508,7 @@
     updateStickerTransformHandle();
 
     updateSlotList();
-    if (apply) scheduleCollagePreview();
+    if (apply) { scheduleCollagePreview(); CollageStudio.changed(); }
   }
 
   async function doExportCollage() {
@@ -3440,9 +3527,9 @@
       const titleEl    = document.getElementById('collage-title-input');
       const subtitleEl = document.getElementById('collage-subtitle-input');
       const infoOverride = {
-        titleTemplate:    titleEl?.value.trim()    || layout.infoBar.titleTemplate    || '',
-        subtitleTemplate: subtitleEl?.value.trim() || layout.infoBar.subtitleTemplate || '',
-        enabled: layout.infoBar.enabled !== false,
+        titleTemplate:    titleEl?.value.trim()    || layout.infoBar?.titleTemplate    || '',
+        subtitleTemplate: subtitleEl?.value.trim() || layout.infoBar?.subtitleTemplate || '',
+        enabled: layout.infoBar?.enabled !== false,
       };
 
       const longEdge = state.exportLongEdge || layout.output?.longEdge || 3000;
@@ -3452,17 +3539,14 @@
 
       const fmt     = state.exportFormat || layout.output?.format || 'jpeg';
       const quality = (state.exportQuality || layout.output?.quality || 95) / 100;
-      const mimeType = fmt === 'png' ? 'image/png' : 'image/jpeg';
-
-      canvas.toBlob(blob => {
-        if (!blob) { showToast('导出失败', 'error'); return; }
-        const a = document.createElement('a');
-        a.href     = URL.createObjectURL(blob);
-        a.download = `collage-${layout.id}-${Date.now()}.${fmt === 'png' ? 'png' : 'jpg'}`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-        showToast('拼图已导出！');
-      }, mimeType, quality);
+      const blob = await CanvasRenderer.canvasToBlob(canvas, fmt, quality);
+      const a = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
+      a.download = `collage-${layout.id}-${Date.now()}.${fmt === 'png' ? 'png' : 'jpg'}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      showToast('拼图已导出！');
+      canvas.width = canvas.height = 0;
 
     } catch (e) {
       showToast('导出失败: ' + e.message, 'error');
@@ -4672,7 +4756,12 @@
   }
 
   /** 保存所有 job 元数据 + 当前激活状态到 IndexedDB */
-  async function doSaveSession() {
+  function doSaveSession() {
+    sessionSaveInFlight = sessionSaveInFlight.then(persistSession, persistSession);
+    return sessionSaveInFlight;
+  }
+
+  async function persistSession() {
     try {
       for (const job of state.jobs) {
         const { file: _f, ...meta } = job; // 去掉 File 对象
@@ -4681,7 +4770,10 @@
       await SessionStore.saveSessionState({
         activePresetId: state.activePresetId,
         activeJobId:    state.activeJobId,
+        projectPresets: state.presets,
+        output: { format: state.exportFormat, quality: state.exportQuality, longEdge: state.exportLongEdge, filenameTemplate: state.exportFilenameTemplate },
         jobIds: state.jobs.map(job => job.id),
+        collageBook: CollageStudio.sessionBook(),
       });
     } catch (e) {
       console.warn('会话保存失败', e);
@@ -4699,6 +4791,27 @@
         jobs.sort((a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity));
       }
       state.jobs = jobs;
+      if (sessionState?.collageBook) CollageStudio.restoreSession(sessionState.collageBook);
+      if (sessionState?.projectPresets?.length) {
+        // Upgrade only untouched legacy panorama defaults, keeping custom margins.
+        const legacy = {'612-h':[.04,.26,.03,.03], '617':[.04,.28,.02,.02],
+          'xpan-h':[.04,.28,.03,.03], '3dxpan':[.03,.26,.03,.03],
+          'lomo-rocket-h':[.04,.28,.03,.03], 'lomo-rocket-v':[.03,.14,.03,.03], 'holga-612':[.05,.26,.04,.04]};
+        state.presets = sessionState.projectPresets.map(preset => {
+          const old = legacy[preset.id], current = window.PRESETS.find(p => p.id === preset.id);
+          if (!preset.isCustom && old && current && ['top','bottom','left','right'].every((edge,i) => preset.border?.[edge] === old[i])) {
+            return {...preset, border:{...preset.border, ...Object.fromEntries(['top','bottom','left','right'].map(edge => [edge,current.border[edge]]))}};
+          }
+          return preset;
+        });
+      }
+      if (sessionState?.output) {
+        state.exportFormat = sessionState.output.format; state.exportQuality = sessionState.output.quality;
+        state.exportLongEdge = sessionState.output.longEdge; state.exportFilenameTemplate = sessionState.output.filenameTemplate;
+        setVal('output-format', state.exportFormat); setVal('output-quality', state.exportQuality);
+        setVal('output-resolution', state.exportLongEdge); setVal('output-filename', state.exportFilenameTemplate);
+        document.getElementById('quality-label').textContent = state.exportQuality + '%';
+      }
 
       // 恢复激活状态
       if (sessionState?.activeJobId && jobs.find(j => j.id === sessionState.activeJobId)) {
@@ -4746,6 +4859,8 @@
         console.warn('清空失败', e);
       }
       state.jobs = [];
+      exitCollageMode(); CollageStudio.restore(null);
+      CreativeTools.photosChanged();
       state.activeJobId = null;
       clearPreview();
       updateFilmstrip();

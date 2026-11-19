@@ -135,5 +135,12 @@ window.FontLibrary = (() => {
     });
   }
 
-  return { populate, selectValue, cssFamily, isAvailable };
+  function register(family, label = family) {
+    names.set(family, label); availability.set(family, true);
+    let group = groups.find(([name]) => name === '我的字体');
+    if (!group) { group = ['我的字体', []]; groups.unshift(group); }
+    if (!group[1].some(([name]) => name === family)) group[1].push([family, label]);
+    for (const picker of document.querySelectorAll('select[data-font-picker]')) renderOptions(picker, picker.value);
+  }
+  return { register, populate, selectValue, cssFamily, isAvailable };
 })();

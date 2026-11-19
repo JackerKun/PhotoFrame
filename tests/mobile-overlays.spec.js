@@ -123,6 +123,7 @@ test('choosing a collage dismisses the sheet and its photo picker and crop contr
   await openPanel(page, 'presets');
   await page.getByRole('button', { name: '拼图', exact: true }).tap();
   await page.locator('.preset-card[data-id="cl-2h"]').tap();
+  for(let i=0;i<2;i++)await page.locator('.cf-photo').nth(i).click();await page.locator('#cf-start').click();
   await expect(page.locator('#panel-left')).not.toHaveClass(/mobile-open/);
   await expect(page.locator('#mobile-panel-backdrop')).toBeHidden();
   await expect(page.locator('#collage-overlay')).toBeVisible();
